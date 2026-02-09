@@ -170,6 +170,11 @@
         transform: scale(0.156);
         transform-origin: 0 0;
         pointer-events: none;
+        background: #0f172a;
+      }
+
+      .node-thumbnail iframe:not([src]) {
+        display: none;
       }
 
       .node-thumbnail .placeholder {
@@ -499,6 +504,8 @@
       document.getElementById("sectionName").textContent =
         sectionId || "Unknown";
 
+      console.log("📊 Sitemap params:", { projectName, sectionId });
+
       // Canvas state
       let scale = 1;
       let offsetX = 500;
@@ -651,7 +658,19 @@
           if (node.type === "start") {
             thumbnailHtml = '<div class="placeholder">🚩</div>';
           } else {
-            thumbnailHtml = `<iframe src="/api/capture/preview/${projectName}/${sectionId}/${node.id}" sandbox="allow-same-origin" loading="lazy"></iframe>`;
+            // Add loading placeholder + iframe with proper sandbox
+            const loaderId = `loader-${node.id}`;
+            const previewUrl = `/api/capture/preview/${projectName}/${sectionId}/${node.id}`;
+            console.log(`Loading preview for ${node.id}:`, previewUrl);
+            thumbnailHtml = `
+              <div class="placeholder" id="${loaderId}" style="position: absolute; width: 100%; height: 100%; z-index: 1;">⏳</div>
+              <iframe 
+                src="${previewUrl}" 
+                sandbox="allow-same-origin allow-scripts" 
+                loading="lazy"
+                onload="document.getElementById('${loaderId}')?.remove(); console.log('✅ Loaded: ${node.id}')"
+                onerror="console.error('❌ Failed: ${node.id}'); this.style.display='none'; this.parentElement.innerHTML='<div class=\\'placeholder\\'>❌</div>'">
+              </iframe>`;
           }
 
           el.innerHTML = `

@@ -406,30 +406,67 @@ router.post('/update-domain/:projectName/:section', async (req, res, next) => {
 /**
  * Get screen preview (HTML for iframe rendering)
  * GET /api/capture/preview/:projectName/:section/:screenId
+ * Also supports nested paths: /api/capture/preview/:projectName/:section/path/to/screen
  */
-router.get('/preview/:projectName/:section/:screenId', async (req, res, next) => {
+router.get('/preview/:projectName/:section/*', async (req, res, next) => {
     try {
-        const { projectName, section, screenId } = req.params;
-        const sectionPath = storageService.getSectionPath(projectName, section);
-        const basePath = await resolveScreenPath(sectionPath, screenId);
+        const { projectName, section } = req.params;
+        const screenPath = req.params[0]; // everything after section/
+        const isThumbnail = req.query.mode === 'thumbnail';
 
-        if (!basePath) {
-            return res.status(404).json({ error: 'Preview not found' });
+        // Resolve section path: 'main' uses main folder, others use sections folder
+        let sectionPath;
+        if (section === 'main') {
+            sectionPath = storageService.getMainPath(projectName);
+        } else {
+            sectionPath = storageService.getSectionPath(projectName, section);
         }
 
-        // Prefer screen.html (full page reproduction via HTML/CSS/JS)
-        const htmlPath = path.join(basePath, 'screen.html');
-        if (await fs.pathExists(htmlPath)) {
-            const html = await fs.readFile(htmlPath, 'utf-8');
-            res.type('text/html').send(html);
-            return;
+        // Try to find screen.html
+        let html = null;
+
+        // Strategy 1: Try the full nested path directly
+        const directPath = path.join(sectionPath, screenPath);
+        if (await fs.pathExists(path.join(directPath, 'screen.html'))) {
+            html = await fs.readFile(path.join(directPath, 'screen.html'), 'utf-8');
+        }
+
+        // Strategy 2: Try with 'start/' prefix
+        if (!html) {
+            const withStartPath = path.join(sectionPath, 'start', screenPath);
+            if (await fs.pathExists(path.join(withStartPath, 'screen.html'))) {
+                html = await fs.readFile(path.join(withStartPath, 'screen.html'), 'utf-8');
+            }
+        }
+
+        // Strategy 3: Extract just the last segment as screenId, use resolveScreenPath
+        if (!html) {
+            const screenId = screenPath.split('/').pop();
+            const basePath = await resolveScreenPath(sectionPath, screenId);
+            if (basePath) {
+                const htmlPath = path.join(basePath, 'screen.html');
+                if (await fs.pathExists(htmlPath)) {
+                    html = await fs.readFile(htmlPath, 'utf-8');
+                }
+            }
+        }
+
+        if (html) {
+            // If thumbnail mode, strip heavy content for lightweight preview
+            if (isThumbnail) {
+                html = stripForThumbnail(html);
+            }
+            return res.type('text/html').send(html);
         }
 
         // Fallback: render basic info from dom.json
-        const domPath = path.join(basePath, 'dom.json');
-        if (await fs.pathExists(domPath)) {
-            const domData = await fs.readJson(domPath);
-            const html = `<!DOCTYPE html>
+        const screenId = screenPath.split('/').pop();
+        const basePath = await resolveScreenPath(sectionPath, screenId);
+        if (basePath) {
+            const domPath = path.join(basePath, 'dom.json');
+            if (await fs.pathExists(domPath)) {
+                const domData = await fs.readJson(domPath);
+                const fallbackHtml = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -450,14 +487,59 @@ router.get('/preview/:projectName/:section/:screenId', async (req, res, next) =>
     <p>DOM data available for comparison. Full HTML preview not captured.</p>
 </body>
 </html>`;
-            res.type('text/html').send(html);
-        } else {
-            return res.status(404).json({ error: 'Preview not found' });
+                return res.type('text/html').send(fallbackHtml);
+            }
         }
+
+        return res.status(404).json({ error: 'Preview not found' });
     } catch (error) {
         next(error);
     }
 });
+
+/**
+ * Strip heavy content from HTML for lightweight thumbnail preview
+ * Removes: scripts, external links, icon fonts (MDI/FA), animations, transitions
+ */
+function stripForThumbnail(html) {
+    // 1. Remove all <script> tags and content
+    html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+    // 2. Remove <link> tags (external stylesheets, fonts)
+    html = html.replace(/<link[^>]*>/gi, '');
+
+    // 3. Remove massive icon font CSS rules (MDI, FontAwesome, Material Icons)
+    // These can be 500KB+ of CSS that's unnecessary for a thumbnail
+    html = html.replace(/\.mdi-[^{]*\{[^}]*\}/g, '');
+    html = html.replace(/\.fa-[^{]*\{[^}]*\}/g, '');
+    html = html.replace(/\.material-icons[^{]*\{[^}]*\}/g, '');
+    html = html.replace(/\.v-icon[^{]*\{[^}]*\}/g, '');
+
+    // 4. Remove @font-face declarations
+    html = html.replace(/@font-face\s*\{[^}]*\}/g, '');
+
+    // 5. Remove @keyframes (animations)
+    html = html.replace(/@keyframes\s+[\w-]+\s*\{[^}]*(\{[^}]*\}[^}]*)*\}/g, '');
+
+    // 6. Remove @import rules
+    html = html.replace(/@import\s+[^;]+;/g, '');
+
+    // 7. Add thumbnail-specific styles: no animations, no scroll, no pointer events
+    const thumbStyles = `<style>
+        * { animation: none !important; transition: none !important; }
+        body { overflow: hidden !important; pointer-events: none !important; }
+        img { loading: eager; }
+    </style>`;
+
+    // Insert before </head> or at start
+    if (html.includes('</head>')) {
+        html = html.replace('</head>', thumbStyles + '</head>');
+    } else {
+        html = thumbStyles + html;
+    }
+
+    return html;
+}
 
 /**
  * List all screens in a section (recursively scans nested folders)

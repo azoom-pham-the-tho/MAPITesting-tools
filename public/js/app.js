@@ -2145,6 +2145,7 @@ const isMatch = (a, b) => {
 // ========================================
 
 let sitemapFlowData = null;
+let sitemapNodePositions = new Map(); // Module-level for reuse during drag
 
 async function loadSitemapWorkspace() {
   if (!state.currentProject) return;
@@ -2240,8 +2241,11 @@ function getScreenNodesFromTree(nodes, parentPath = "", level = 0) {
     // Direct UI node (tab, modal, or standalone page)
     // OR a Folder that is implicitly a screen because it has a 'UI' child
     // Check 1: Is this node itself a UI/Tab/Modal?
+    // Note: mainTree stores real type in 'nodeType' (page/modal/tab), while 'type' is always 'ui'
+    const realType = node.nodeType || node.type || "page";
     const isDirectUI =
-      node.type === "ui" || node.type === "tab" || node.type === "modal";
+      node.type === "ui" || node.type === "tab" || node.type === "modal" ||
+      realType === "page" || realType === "modal" || realType === "tab";
 
     // Check 2: Is this a folder that acts as a screen container? (Has a literal 'UI' file child)
     // Note: Only check for name === "UI" (a literal file), NOT type === "ui" (which means page/screen)
@@ -2254,7 +2258,7 @@ function getScreenNodesFromTree(nodes, parentPath = "", level = 0) {
       screenNodes.push({
         path: node.path || node.urlPath || node.name,
         name: node.name,
-        type: node.type,
+        type: realType, // Use real type (page/modal/tab) instead of generic 'ui'
         level: level,
       });
     } else if (hasUiChild) {
@@ -2323,19 +2327,30 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
     relativePath = normPath.split("/main/")[1];
   }
 
+  // Remove 'start/' prefix if present (start is a virtual node, not a real folder)
+  if (relativePath.startsWith("start/")) {
+    relativePath = relativePath.substring(6); // Remove "start/"
+  }
+
   // Split relative path by / and encode each segment to handle spaces/special chars
   const safePath = relativePath
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  const screenshotUrl = `/storage/${encodeURIComponent(state.currentProject)}/main/${safePath}/screenshot.png`;
 
-  div.dataset.bg = screenshotUrl; // Optimization: Lazy load
+  // Use lightweight thumbnail preview for sitemap (strips scripts, icon fonts, animations)
+  const previewUrl = `/api/capture/preview/${encodeURIComponent(state.currentProject)}/main/${safePath}?mode=thumbnail`;
+
+  // Store preview URL for lazy loading — don't create iframe yet
+  div.dataset.previewUrl = previewUrl;
 
   div.innerHTML = `
         <div class="node-thumbnail">
             <div class="node-type-badge">${typeLabel}</div>
             ${normPath === normalize(startNodePath) ? '<div class="start-badge">START</div>' : ""}
+            <div class="node-preview-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px;background:#f1f5f9;">
+              ⏳
+            </div>
         </div>
         <div class="node-info">
             <div class="node-title">${cleanName}</div>
@@ -2403,6 +2418,7 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
 
   div.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return; // Only left click
+    e.preventDefault(); // Prevent text selection / native drag
     e.stopPropagation(); // Prevent workspace panning
 
     isNodeDragging = true;
@@ -2414,6 +2430,9 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
     div.style.zIndex = 1000;
     div.style.cursor = "grabbing";
     document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none"; // Prevent text selection globally
+    // Disable iframes from stealing mouse events during drag
+    document.querySelectorAll(".node-thumbnail iframe").forEach(f => f.style.pointerEvents = "none");
 
     const onNodeMouseMove = (me) => {
       if (!isNodeDragging) return;
@@ -2424,8 +2443,14 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
       const dx = (me.clientX - dragStartX) / scale;
       const dy = (me.clientY - dragStartY) / scale;
 
-      div.style.left = `${initialLeft + dx}px`;
-      div.style.top = `${initialTop + dy}px`;
+      const newX = initialLeft + dx;
+      const newY = initialTop + dy;
+      div.style.left = `${newX}px`;
+      div.style.top = `${newY}px`;
+
+      // Realtime edge update: update position and redraw edges
+      sitemapNodePositions.set(normPath, { x: newX, y: newY });
+      redrawEdgesOnly();
     };
 
     const onNodeMouseUp = async (me) => {
@@ -2434,6 +2459,9 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
       div.style.zIndex = "";
       div.style.cursor = "";
       document.body.style.cursor = "";
+      document.body.style.userSelect = ""; // Re-enable text selection
+      // Re-enable iframe pointer events
+      document.querySelectorAll(".node-thumbnail iframe").forEach(f => f.style.pointerEvents = "");
 
       document.removeEventListener("mousemove", onNodeMouseMove);
       document.removeEventListener("mouseup", onNodeMouseUp);
@@ -2456,10 +2484,9 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
           await api.saveFlowPositions(state.currentProject, {
             [normPath]: newPos,
           });
-          // Refresh workspace to update edges specific to this change is better,
-          // but calling the full reload ensures edges are redrawn correctly.
-          // We can define a simplified redraw edges function later if performance is bad.
-          loadSitemapWorkspace();
+          // Lightweight: only redraw edges, don't rebuild nodes
+          sitemapNodePositions.set(normPath, newPos);
+          redrawEdgesOnly();
         } catch (err) {
           console.error("Failed to save node position", err);
           showToast("Lỗi lưu vị trí node", "error");
@@ -2495,26 +2522,6 @@ function renderSitemapVisual(flow, container, svg) {
 
   // Optimize: Batch DOM updates with Fragment
   const fragment = document.createDocumentFragment();
-
-  // Optimize: Lazy Load Images with IntersectionObserver
-  const imageObserver = new IntersectionObserver(
-    (entries, observer) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const nodeDiv = entry.target;
-          const thumb = nodeDiv.querySelector(".node-thumbnail");
-          const bgUrl = nodeDiv.dataset.bg;
-
-          if (bgUrl && thumb) {
-            thumb.style.backgroundImage = `url('${bgUrl}')`;
-            nodeDiv.removeAttribute("data-bg");
-            observer.unobserve(nodeDiv);
-          }
-        }
-      });
-    },
-    { root: elements.sitemapWorkspace, rootMargin: "200px" },
-  );
 
   // Determine start node from flow (Short Name)
   let startNodeShortName = "login";
@@ -2840,6 +2847,7 @@ function renderSitemapVisual(flow, container, svg) {
     }
 
     nodePositions.set(normItemPath, { x, y });
+    sitemapNodePositions.set(normItemPath, { x, y }); // Sync module-level
     const div = createVisualNode(
       item,
       x,
@@ -2850,7 +2858,6 @@ function renderSitemapVisual(flow, container, svg) {
       svg,
     );
     if (div) {
-      imageObserver.observe(div);
       fragment.appendChild(div);
     }
   });
@@ -2863,6 +2870,54 @@ function renderSitemapVisual(flow, container, svg) {
     renderEdges(flow.edges, nodePositions, container, svg);
   }
 
+  // 6. Lazy load previews with IntersectionObserver
+  const previewObserver = new IntersectionObserver(
+    (entries, observer) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const nodeDiv = entry.target;
+          const previewUrl = nodeDiv.dataset.previewUrl;
+          if (!previewUrl) return;
+
+          const thumb = nodeDiv.querySelector(".node-thumbnail");
+          const placeholder = nodeDiv.querySelector(".node-preview-placeholder");
+          if (!thumb) return;
+
+          // Create lightweight iframe for this node
+          const iframe = document.createElement("iframe");
+          iframe.src = previewUrl;
+          iframe.sandbox = "allow-same-origin allow-scripts";
+          iframe.style.cssText = "width:1400px;height:800px;transform:scale(0.2);transform-origin:0 0;border:none;pointer-events:none;position:absolute;top:0;left:0;opacity:0;transition:opacity 0.3s;";
+
+          iframe.onload = () => {
+            // Fade in
+            iframe.style.opacity = "1";
+            // Remove placeholder
+            if (placeholder) placeholder.remove();
+          };
+
+          iframe.onerror = () => {
+            // On error, show fallback
+            if (placeholder) placeholder.textContent = "📄";
+            iframe.remove();
+          };
+
+          thumb.appendChild(iframe);
+
+          // Stop observing this node
+          nodeDiv.removeAttribute("data-preview-url");
+          observer.unobserve(nodeDiv);
+        }
+      });
+    },
+    { root: elements.sitemapWorkspace, rootMargin: "300px" }
+  );
+
+  // Observe all nodes with preview URLs
+  container.querySelectorAll(".sitemap-node-visual[data-preview-url]").forEach(node => {
+    previewObserver.observe(node);
+  });
+
   // Single-shot auto center after render
   const view = elements.sitemapWorkspace;
   if (view && !view._firstRenderDone) {
@@ -2871,6 +2926,32 @@ function renderSitemapVisual(flow, container, svg) {
   }
 
   setupSitemapPanning(view, container);
+}
+
+// Lightweight edge redraw — only clears SVG and labels, redraws edges
+// Used during drag to avoid expensive full re-render
+let _redrawEdgesRAF = null;
+function redrawEdgesOnly() {
+  // Throttle with requestAnimationFrame for smooth 60fps
+  if (_redrawEdgesRAF) return;
+  _redrawEdgesRAF = requestAnimationFrame(() => {
+    _redrawEdgesRAF = null;
+
+    const container = elements.workspaceNodesContainer;
+    const svg = elements.workspaceEdgesSvg;
+    if (!container || !svg || !sitemapFlowData) return;
+
+    // Clear SVG edges
+    svg.innerHTML = "";
+
+    // Clear edge labels (but NOT nodes!)
+    container.querySelectorAll(".sitemap-edge-label").forEach(el => el.remove());
+
+    // Redraw edges using current positions
+    if (sitemapFlowData.edges) {
+      renderEdges(sitemapFlowData.edges, sitemapNodePositions, container, svg);
+    }
+  });
 }
 
 function renderEdges(edges, nodePositions, container, svg) {
@@ -2936,21 +3017,29 @@ function renderEdges(edges, nodePositions, container, svg) {
       const d = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
       path.setAttribute("d", d);
       path.setAttribute("class", "sitemap-edge-path");
-      path.dataset.source = edge.from;
-      path.dataset.target = edge.to;
+      path.dataset.source = normalize(edge.from);
+      path.dataset.target = normalize(edge.to);
       path.setAttribute("stroke", "#cbd5e1");
       path.setAttribute("stroke-width", "2");
       path.setAttribute("fill", "none");
       path.setAttribute("marker-end", "url(#arrowhead-modern)");
       svg.appendChild(path);
 
-      if (
-        edge.interaction &&
-        (edge.interaction.text || edge.interaction.selector)
-      ) {
-        const labelText = edge.interaction.text || edge.interaction.selector;
+      // Build label text from edge data
+      // Priority: edge.label (flow description) > edge.interaction.text > edge.interaction.selector
+      let labelText = "";
+      if (edge.label) {
+        // Truncate long labels
+        labelText = edge.label.length > 40 ? edge.label.substring(0, 37) + "..." : edge.label;
+      } else if (edge.interaction && (edge.interaction.text || edge.interaction.selector)) {
+        labelText = edge.interaction.text || edge.interaction.selector;
+      }
+
+      if (labelText) {
         const label = document.createElement("div");
         label.className = "sitemap-edge-label";
+        label.dataset.source = normalize(edge.from);
+        label.dataset.target = normalize(edge.to);
         label.textContent = labelText;
 
         // Position label on the mid-curve
@@ -3140,15 +3229,30 @@ function highlightPathTo(targetPath, flow, container, svg, startPath = "home") {
     // Highlight Edges
     foundPath.edges.forEach((e) => {
       if (e.type === "explicit" && e.edgeData) {
-        const s = e.edgeData.source;
-        const t = e.edgeData.target;
+        const s = normalize(e.edgeData.from);
+        const t = normalize(e.edgeData.to);
+        // Find edge path element
         const edgeEl = svg.querySelector(
           `.sitemap-edge-path[data-source="${s}"][data-target="${t}"]`,
+        ) || svg.querySelector(
+          `.sitemap-edge-path[data-source="${e.edgeData.from}"][data-target="${e.edgeData.to}"]`,
         );
         if (edgeEl) {
           edgeEl.classList.remove("faded");
           edgeEl.classList.add("highlighted-path");
+          edgeEl.setAttribute("stroke", "#3b82f6");
+          edgeEl.setAttribute("stroke-width", "3");
           edgeEl.style.opacity = "1";
+        }
+
+        // Also highlight the edge label
+        const labelEl = container.querySelector(
+          `.sitemap-edge-label[data-source="${s}"][data-target="${t}"]`,
+        );
+        if (labelEl) {
+          labelEl.classList.remove("faded");
+          labelEl.classList.add("highlighted");
+          labelEl.style.opacity = "1";
         }
       }
     });
@@ -3179,7 +3283,7 @@ function highlightPathTo(targetPath, flow, container, svg, startPath = "home") {
       const pathKeys = new Set(
         foundPath.edges.map((e) => {
           if (e.edgeData)
-            return uniqueKey(e.edgeData.source, e.edgeData.target);
+            return uniqueKey(e.edgeData.from, e.edgeData.to);
           return "";
         }),
       );
