@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quality Settings Demo</title>
+  <link rel="stylesheet" href="/css/adaptive-quality.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      color: #667eea;
+    }
+
+    .btn-icon {
+      position: relative;
+      background: #667eea;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: white;
+    }
+
+    .btn-icon:hover {
+      background: #5568d3;
+      transform: scale(1.05);
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .demo-card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+    }
+
+    .demo-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+
+    .demo-card h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #667eea;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .info-item {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .info-label {
+      font-size: 12px;
+      color: #6c757d;
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .animated-box {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 12px;
+      margin: 20px auto;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .badge-low { background: #fff1f0; color: #ff4d4f; }
+    .badge-medium { background: #fffbe6; color: #faad14; }
+    .badge-high { background: #f6ffed; color: #52c41a; }
+
+    .test-section {
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .test-section h2 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      color: #667eea;
+    }
+
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      margin: 8px;
+    }
+
+    button:hover {
+      background: #5568d3;
+      transform: scale(1.05);
+    }
+
+    .console-output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      margin-top: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .console-line {
+      margin: 4px 0;
+    }
+
+    .console-info { color: #4fc3f7; }
+    .console-success { color: #66bb6a; }
+    .console-warning { color: #ffa726; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚙️ Quality Settings Demo</h1>
+      <div class="header-actions">
+        <button id="quality-settings-btn" class="btn-icon" title="Quality Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 1v6m0 6v6m8.66-15.66l-4.24 4.24M9.88 14.12l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24M9.88 9.88L5.64 5.64"></path>
+          </svg>
+          <span id="quality-indicator" class="quality-badge"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="demo-grid">
+      <div class="demo-card">
+        <h3>📊 Thông tin hệ thống</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">CPU Cores</div>
+            <div class="info-value" id="cpu-cores">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Memory</div>
+            <div class="info-value" id="memory">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">User Agent</div>
+            <div class="info-value" id="user-agent" style="font-size:11px;word-break:break-all;">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Screen</div>
+            <div class="info-value" id="screen">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-card">
+        <h3>🎯 Cấu hình hiện tại</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Chế độ</div>
+            <div class="info-value" id="current-quality">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Đang áp dụng</div>
+            <div class="info-value" id="applied-quality">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Animations</div>
+            <div class="info-value" id="animations">-</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Image Quality</div>
+            <div class="info-value" id="image-quality">-</div>
+          </div>
+        </div>
+        <div id="quality-status-badge"></div>
+      </div>
+
+      <div class="demo-card">
+        <h3>🎨 Animation Test</h3>
+        <div class="animated-box"></div>
+        <p style="text-align:center;font-size:13px;color:#6c757d;">
+          Hộp này sẽ nhảy liên tục nếu animations được BẬT
+        </p>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>🧪 Testing Console</h2>
+      <div>
+        <button onclick="testDetectTier()">Phát hiện Tier</button>
+        <button onclick="testSetLow()">Đổi sang Low</button>
+        <button onclick="testSetMedium()">Đổi sang Medium</button>
+        <button onclick="testSetHigh()">Đổi sang High</button>
+        <button onclick="testSetAuto()">Đổi sang Auto</button>
+        <button onclick="testGetSettings()">Xem Settings</button>
+        <button onclick="clearConsole()">Clear Console</button>
+      </div>
+      <div class="console-output" id="console-output">
+        <div class="console-line console-info">Ready. Click buttons to test...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/adaptive-quality.js"></script>
+  <script src="/js/quality-settings-ui.js"></script>
+
+  <script>
+    // Update system info
+    function updateSystemInfo() {
+      document.getElementById('cpu-cores').textContent = navigator.hardwareConcurrency || 'Unknown';
+      document.getElementById('memory').textContent =
+        (navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Unknown');
+      document.getElementById('user-agent').textContent =
+        navigator.userAgent.split(' ').slice(0, 3).join(' ');
+      document.getElementById('screen').textContent =
+        `${window.screen.width}x${window.screen.height}`;
+    }
+
+    // Update quality info
+    function updateQualityInfo() {
+      if (!window.qualityManager) return;
+
+      const currentQuality = window.qualityManager.currentQuality;
+      const appliedQuality = window.qualityManager.appliedQuality;
+      const settings = window.qualityManager.getCurrentSettings();
+
+      document.getElementById('current-quality').textContent = currentQuality.toUpperCase();
+      document.getElementById('applied-quality').textContent = appliedQuality.toUpperCase();
+      document.getElementById('animations').textContent = settings.animations ? '✅ BẬT' : '❌ TẮT';
+      document.getElementById('image-quality').textContent = `${settings.imageQuality}%`;
+
+      // Badge
+      const badge = document.getElementById('quality-status-badge');
+      badge.innerHTML = `<span class="status-badge badge-${appliedQuality}">
+        ${appliedQuality.toUpperCase()} MODE
+      </span>`;
+    }
+
+    // Console logging
+    function log(message, type = 'info') {
+      const output = document.getElementById('console-output');
+      const line = document.createElement('div');
+      line.className = `console-line console-${type}`;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      output.appendChild(line);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearConsole() {
+      document.getElementById('console-output').innerHTML =
+        '<div class="console-line console-info">Console cleared.</div>';
+    }
+
+    // Test functions
+    function testDetectTier() {
+      const tier = window.qualityManager.detectTier();
+      log(`Detected tier: ${tier.toUpperCase()}`, 'info');
+      log(`Cores: ${navigator.hardwareConcurrency}, Memory: ${navigator.deviceMemory}GB`, 'info');
+    }
+
+    function testSetLow() {
+      window.qualityManager.setQuality('low');
+      log('Quality set to LOW', 'success');
+      updateQualityInfo();
+    }
+
+    function testSetMedium() {
+      window.qualityManager.setQuality('medium');
+      log('Quality set to MEDIUM', 'success');
+      updateQualityInfo();
+    }
+
+    function testSetHigh() {
+      window.qualityManager.setQuality('high');
+      log('Quality set to HIGH', 'success');
+      updateQualityInfo();
+    }
+
+    function testSetAuto() {
+      window.qualityManager.setQuality('auto');
+      log('Quality set to AUTO', 'success');
+      setTimeout(() => {
+        log(`Auto-selected: ${window.qualityManager.appliedQuality.toUpperCase()}`, 'info');
+        updateQualityInfo();
+      }, 100);
+    }
+
+    function testGetSettings() {
+      const settings = window.qualityManager.getCurrentSettings();
+      log('Current Settings:', 'info');
+      log(`  - Animations: ${settings.animations}`, 'info');
+      log(`  - Image Quality: ${settings.imageQuality}%`, 'info');
+      log(`  - Throttle FPS: ${settings.throttleFPS}`, 'info');
+    }
+
+    // Listen for quality changes
+    window.addEventListener('qualityChanged', (event) => {
+      log(`Quality changed event: ${event.detail.quality.toUpperCase()}`, 'warning');
+      updateQualityInfo();
+    });
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        updateSystemInfo();
+        updateQualityInfo();
+        log('Demo initialized successfully', 'success');
+      }, 500);
+    });
+  </script>
+</body>
+</html>

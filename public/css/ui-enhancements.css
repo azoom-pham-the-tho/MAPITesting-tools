@@ -1,0 +1,1305 @@
+/* ========================================
+   UI Enhancements - Performance Optimized
+   Single consolidated enhancement layer
+   GPU-accelerated, lightweight, smooth on weak devices
+======================================== */
+
+/* ========================================
+   0. PERFORMANCE CRITICAL: Reduce Motion
+======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================
+   1. ENHANCED ROOT VARIABLES
+======================================== */
+:root {
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(102, 126, 234, 0.25);
+  --glow-success: 0 0 20px rgba(16, 185, 129, 0.25);
+  --glow-danger: 0 0 20px rgba(239, 68, 68, 0.25);
+  
+  /* Smooth transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-micro: 100ms var(--ease-out-expo);
+  --transition-smooth: 200ms var(--ease-out-expo);
+  --transition-expand: 300ms var(--ease-out-expo);
+  
+  /* Spacing scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+}
+
+/* ========================================
+   2. ENHANCED SCROLLBARS
+======================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.25);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
+}
+
+/* Auto-hide scrollbar */
+.auto-hide-scroll {
+  scrollbar-color: transparent transparent;
+}
+.auto-hide-scroll:hover {
+  scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
+}
+
+/* ========================================
+   3. ENHANCED HEADER
+======================================== */
+.header {
+  background: linear-gradient(180deg, rgba(15,15,26,0.95) 0%, rgba(26,26,46,0.9) 100%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.15);
+  position: relative;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--gradient-primary);
+  opacity: 0.4;
+}
+
+.logo {
+  letter-spacing: -0.3px;
+  position: relative;
+}
+
+.logo-icon {
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+/* ========================================
+   4. ENHANCED PANELS
+======================================== */
+.panel {
+  contain: layout style;
+  will-change: auto;
+}
+
+.panel-left {
+  border-right: 1px solid rgba(102, 126, 234, 0.08);
+}
+
+.panel-right {
+  border-left: 1px solid rgba(102, 126, 234, 0.08);
+}
+
+.panel-header {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+  position: relative;
+}
+
+.panel-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(102,126,234,0.2), transparent);
+}
+
+.panel-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-content {
+  contain: content;
+}
+
+/* ========================================
+   5. ENHANCED RESIZER
+======================================== */
+.resizer {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+  transition: background var(--transition-micro);
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+.resizer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 40px;
+  border-radius: 1px;
+  background: rgba(102, 126, 234, 0.2);
+  transition: all var(--transition-smooth);
+  opacity: 0;
+}
+
+.resizer:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.resizer:hover::before {
+  opacity: 1;
+  height: 60px;
+  background: rgba(102, 126, 234, 0.5);
+}
+
+.resizer:active {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+/* ========================================
+   6. ENHANCED BUTTONS - Ripple & Glow
+======================================== */
+.btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.3) 0%, transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.4s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.btn:active::after {
+  opacity: 1;
+  transform: scale(2.5);
+  transition: transform 0.1s ease;
+}
+
+.btn-primary {
+  background: var(--gradient-primary);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.3);
+}
+
+.btn-danger:hover:not(:disabled) {
+  box-shadow: var(--glow-danger);
+}
+
+.btn-success:hover:not(:disabled) {
+  box-shadow: var(--glow-success);
+}
+
+/* Loading state for buttons */
+.btn.loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.btn.loading::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+}
+
+.btn.loading .btn-text {
+  visibility: hidden;
+}
+
+.btn.loading .btn-spinner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   7. ENHANCED TABS
+======================================== */
+.workspace-tabs {
+  position: relative;
+  gap: 2px;
+}
+
+.tab-btn {
+  position: relative;
+  border-radius: 6px;
+  transition: all var(--transition-smooth);
+  z-index: 1;
+}
+
+.tab-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: rgba(102, 126, 234, 0.1);
+  transition: opacity var(--transition-micro);
+}
+
+.tab-btn:hover::before {
+  opacity: 1;
+}
+
+.tab-btn.active {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+}
+
+.tab-btn.active::before {
+  display: none;
+}
+
+.tab-group {
+  background: rgba(102, 126, 234, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+/* ========================================
+   8. ENHANCED TREE VIEW
+======================================== */
+.tree-item-content {
+  border-radius: 6px;
+  transition: all var(--transition-micro);
+  position: relative;
+}
+
+.tree-item-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-primary);
+  opacity: 0;
+  transform: scaleY(0);
+  transition: all var(--transition-smooth);
+}
+
+.tree-item-content:hover {
+  background: rgba(102, 126, 234, 0.06);
+}
+
+.tree-item-content:hover::before {
+  opacity: 0.5;
+  transform: scaleY(0.5);
+}
+
+.tree-item-content.selected {
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, transparent 100%);
+  border-left: none;
+}
+
+.tree-item-content.selected::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.tree-children {
+  border-left: 1px solid rgba(102, 126, 234, 0.12);
+  margin-left: 12px;
+  padding-left: 8px;
+}
+
+.tree-toggle {
+  transition: transform var(--transition-smooth);
+  color: var(--accent-primary);
+  opacity: 0.5;
+}
+
+.tree-toggle.expanded {
+  opacity: 0.8;
+}
+
+.tree-label {
+  font-size: 13px;
+}
+
+.tree-badge {
+  background: rgba(102, 126, 234, 0.1);
+  color: var(--accent-primary);
+  font-weight: 500;
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  transition: all var(--transition-micro);
+}
+
+.tree-item-content:hover .tree-badge {
+  background: rgba(102, 126, 234, 0.18);
+}
+
+/* ========================================
+   9. ENHANCED SECTION CARDS
+======================================== */
+.section-card {
+  background: var(--gradient-glass);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  transition: all var(--transition-smooth);
+  contain: content;
+}
+
+.section-card:hover {
+  border-color: rgba(102, 126, 234, 0.25);
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.12);
+  transform: translateY(-1px);
+}
+
+.section-card:active {
+  transform: translateY(0);
+}
+
+.section-timestamp {
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.section-size {
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  font-weight: 500;
+}
+
+.section-actions .btn {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+/* ========================================
+   10. ENHANCED MODALS
+======================================== */
+.modal {
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+}
+
+.modal-content {
+  background: linear-gradient(180deg, rgba(26,26,46,0.98) 0%, rgba(22,33,62,0.98) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(102, 126, 234, 0.08);
+  animation: modal-enter 0.25s var(--ease-out-expo);
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-body {
+  padding: 20px 24px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(102, 126, 234, 0.08);
+  background: rgba(0,0,0,0.1);
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-micro);
+}
+
+.modal-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  transform: rotate(90deg);
+}
+
+/* ========================================
+   11. ENHANCED FORM INPUTS
+======================================== */
+.select-input,
+.input,
+.text-input {
+  background: rgba(15, 15, 26, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--transition-smooth);
+}
+
+.select-input:focus,
+.input:focus,
+.text-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15), var(--glow-primary);
+  outline: none;
+  background: rgba(15, 15, 26, 0.7);
+}
+
+.select-input:hover,
+.input:hover,
+.text-input:hover {
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+/* ========================================
+   12. ENHANCED TOAST NOTIFICATIONS
+======================================== */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  animation: toast-in 0.3s var(--ease-spring);
+  max-width: 380px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.toast.removing {
+  animation: toast-out 0.2s var(--ease-out-expo) forwards;
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+}
+
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error   { border-left: 3px solid var(--danger); }
+.toast.warning { border-left: 3px solid var(--warning); }
+.toast.info    { border-left: 3px solid var(--info); }
+
+.toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: all var(--transition-micro);
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.05);
+}
+
+/* ========================================
+   13. TOP LOADING BAR
+======================================== */
+.loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  width: 0;
+  z-index: 99999;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+}
+
+.loading-bar.active {
+  width: 80%;
+  transition: width 8s cubic-bezier(0.1, 0.05, 0, 1);
+}
+
+.loading-bar.complete {
+  width: 100%;
+  transition: width 0.2s ease;
+  opacity: 0;
+  transition: width 0.2s ease, opacity 0.3s ease 0.2s;
+}
+
+/* ========================================
+   14. ENHANCED EMPTY STATE
+======================================== */
+.empty-state {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+.empty-state p {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 260px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ========================================
+   15. SHIMMER LOADING SKELETON
+======================================== */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.06) 50%,
+    rgba(255,255,255,0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========================================
+   16. ENHANCED STAT CARDS
+======================================== */
+.stat-card {
+  background: var(--gradient-glass);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  transition: all var(--transition-smooth);
+}
+
+.stat-card:hover {
+  border-color: rgba(102, 126, 234, 0.2);
+  background: rgba(102, 126, 234, 0.06);
+}
+
+.stat-number {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   17. CAPTURE TOOLS ENHANCEMENT
+======================================== */
+.capture-info-box {
+  background: var(--gradient-glass);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+}
+
+.capture-hint {
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 10px;
+}
+
+.capture-hint kbd {
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  color: var(--accent-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.screen-item-captured {
+  background: var(--gradient-glass);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  transition: all var(--transition-smooth);
+}
+
+.screen-item-captured:hover {
+  border-color: rgba(102, 126, 234, 0.2);
+  background: rgba(102, 126, 234, 0.06);
+  transform: translateX(3px);
+}
+
+.screen-item-captured.latest {
+  border-color: var(--success);
+  box-shadow: var(--glow-success);
+}
+
+/* ========================================
+   18. ENHANCED SITEMAP WORKSPACE
+======================================== */
+.sitemap-workspace {
+  background: radial-gradient(circle at 50% 50%, rgba(102,126,234,0.03) 0%, transparent 70%) !important;
+}
+
+.sitemap-overlay-tools {
+  backdrop-filter: blur(0);
+}
+
+.sitemap-overlay-tools .search-box {
+  background: rgba(26, 26, 46, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(102, 126, 234, 0.15) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+
+.sitemap-overlay-tools .search-box input {
+  color: var(--text-primary) !important;
+  background: transparent !important;
+}
+
+.sitemap-overlay-tools .search-box input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.sitemap-overlay-tools .zoom-controls {
+  background: rgba(26, 26, 46, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(102, 126, 234, 0.15) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+
+/* ========================================
+   19. CONTEXT MENU
+======================================== */
+.context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: rgba(26, 26, 46, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 10px;
+  padding: 4px;
+  min-width: 180px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  animation: context-enter 0.15s var(--ease-out-expo);
+}
+
+@keyframes context-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all var(--transition-micro);
+}
+
+.context-menu-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: var(--text-primary);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 8px;
+}
+
+/* ========================================
+   20. KEYBOARD SHORTCUTS MODAL
+======================================== */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shortcuts-panel {
+  background: rgba(26, 26, 46, 0.98);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  animation: modal-enter 0.25s var(--ease-out-expo);
+}
+
+.shortcuts-panel h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shortcuts-section {
+  margin-bottom: 16px;
+}
+
+.shortcuts-section h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcut-key kbd {
+  background: rgba(102, 126, 234, 0.12);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: 'Inter', monospace;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.shortcut-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ========================================
+   21. GLOBAL SEARCH OVERLAY
+======================================== */
+.global-search-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  animation: fade-in 0.15s ease;
+}
+
+.global-search-box {
+  background: rgba(26, 26, 46, 0.98);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 40px rgba(102,126,234,0.08);
+  animation: modal-enter 0.2s var(--ease-out-expo);
+  overflow: hidden;
+}
+
+.global-search-input {
+  width: 100%;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 16px;
+  outline: none;
+}
+
+.global-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.global-search-results {
+  max-height: 300px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background var(--transition-micro);
+}
+
+.search-result-item:hover,
+.search-result-item.active {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.search-result-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.search-result-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-result-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.global-search-hint {
+  padding: 8px 20px;
+  border-top: 1px solid rgba(102, 126, 234, 0.06);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 12px;
+}
+
+.global-search-hint kbd {
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--accent-primary);
+}
+
+/* ========================================
+   22. SMART ACTIONS (show on hover)
+======================================== */
+.smart-actions {
+  opacity: 0;
+  transition: opacity var(--transition-micro);
+  pointer-events: none;
+}
+
+.section-card:hover .smart-actions,
+.tree-item-content:hover .smart-actions,
+*:hover > .smart-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ========================================
+   23. CREDENTIALS MODAL
+======================================== */
+#credentialsModal .modal-content {
+  max-width: 420px;
+}
+
+/* ========================================
+   24. DOCUMENTS TAB ENHANCEMENTS
+======================================== */
+.doc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.08);
+  gap: 12px;
+}
+
+.doc-upload-btn {
+  cursor: pointer;
+}
+
+.doc-search {
+  background: rgba(15, 15, 26, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  transition: all var(--transition-smooth);
+  width: 160px;
+}
+
+.doc-search:focus {
+  border-color: rgba(102, 126, 234, 0.3);
+  width: 200px;
+}
+
+.doc-drop-zone {
+  margin: 12px 16px;
+  border: 2px dashed rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  transition: all var(--transition-smooth);
+}
+
+.doc-drop-zone.drag-over {
+  border-color: var(--accent-primary);
+  background: rgba(102, 126, 234, 0.06);
+}
+
+.doc-drop-zone p {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.doc-drop-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ========================================
+   25. COMPARE VIEW ENHANCEMENTS
+======================================== */
+.compare-selectors {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.08);
+  align-items: center;
+}
+
+.compare-selectors select {
+  flex: 1;
+}
+
+.compare-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ========================================
+   26. ACCESSIBILITY
+======================================== */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  padding: 8px 16px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 0 0 8px 8px;
+  z-index: 100000;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ARIA live region */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ========================================
+   27. IMPORT MODAL TABS ENHANCEMENT
+======================================== */
+.import-tab-btn {
+  position: relative;
+  transition: all var(--transition-smooth) !important;
+}
+
+.import-tab-btn.active {
+  color: var(--accent-primary) !important;
+  border-bottom-color: var(--accent-primary) !important;
+}
+
+.import-tab-btn:hover {
+  color: var(--text-primary) !important;
+}
+
+/* ========================================
+   28. RESPONSIVE DESIGN
+======================================== */
+@media (max-width: 1024px) {
+  .header {
+    padding: 0 16px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--header-height);
+    gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  
+  .panel-left { width: 240px; min-width: 200px; }
+  .panel-right { width: 260px; min-width: 240px; }
+  
+  .project-stats { display: none; }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .panel-left,
+  .panel-right {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 200px;
+  }
+  
+  .panel-center {
+    min-width: 100%;
+  }
+  
+  .resizer {
+    display: none;
+  }
+  
+  .header-right {
+    display: none;
+  }
+  
+  .workspace-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  
+  .tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* ========================================
+   29. PRINT STYLES
+======================================== */
+@media print {
+  .header, .panel-left, .panel-right, .resizer,
+  .capture-bar, .toast-container, .context-menu {
+    display: none !important;
+  }
+  
+  .panel-center {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+  
+  .main-content {
+    display: block;
+  }
+  
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* ========================================
+   30. HIGH CONTRAST MODE
+======================================== */
+@media (prefers-contrast: high) {
+  :root {
+    --border-color: rgba(255, 255, 255, 0.3);
+    --bg-glass: rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn {
+    border: 1px solid currentColor;
+  }
+  
+  .tree-item-content.selected {
+    outline: 2px solid var(--accent-primary);
+  }
+}
+
+/* Light mode intentionally not included - this tool uses dark theme exclusively */

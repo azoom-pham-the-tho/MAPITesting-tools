@@ -1,0 +1,125 @@
+{
+  "name": "ui-api-testing-tool",
+  "version": "1.0.0",
+  "description": "Desktop app để capture, lưu trữ và so sánh UI (DOM/CSS) và API (Request/Response)",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "electron": "electron .",
+    "dev": "electron . --dev",
+    "server": "node server.js",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.testing.mapi-tool",
+    "productName": "MAPI-Testing-Tool",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "src/**/*",
+      "node_modules/**/*",
+      "!storage/**/*",
+      "!dist/**/*",
+      "!build/**/*",
+      "!*.md"
+    ],
+    "mac": {
+      "target": {
+        "target": "dmg",
+        "arch": [
+          "universal"
+        ]
+      },
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MAPI-Testing-Tool"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icons",
+      "category": "Development"
+    },
+    "asar": true,
+    "compression": "maximum"
+  },
+  "keywords": [
+    "electron",
+    "playwright",
+    "ui-testing",
+    "api-testing",
+    "dom-snapshot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@googleapis/drive": "^20.1.0",
+    "archiver": "^7.0.1",
+    "canvas": "^3.2.1",
+    "compression": "^1.8.1",
+    "core-js": "^3.48.0",
+    "diff": "^8.0.3",
+    "express": "^4.18.2",
+    "fs-extra": "^11.2.0",
+    "mammoth": "^1.11.0",
+    "multer": "^2.0.2",
+    "pdf2json": "^4.0.2",
+    "playwright-core": "^1.40.0",
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}

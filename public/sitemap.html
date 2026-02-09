@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sitemap Viewer - MAPIT</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Header */
+      .header {
+        height: 56px;
+        background: #1e293b;
+        border-bottom: 1px solid #334155;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 20px;
+      }
+
+      .header h1 {
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .breadcrumb {
+        font-size: 13px;
+        color: #94a3b8;
+      }
+
+      .breadcrumb a {
+        color: #60a5fa;
+        text-decoration: none;
+      }
+
+      .header-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .btn-secondary {
+        background: #334155;
+        color: #e2e8f0;
+      }
+
+      /* Main canvas */
+      .canvas-container {
+        height: calc(100vh - 56px);
+        position: relative;
+        overflow: hidden;
+        cursor: grab;
+      }
+
+      .canvas-container:active {
+        cursor: grabbing;
+      }
+
+      .canvas {
+        position: absolute;
+        width: 10000px;
+        height: 10000px;
+        transform-origin: 0 0;
+      }
+
+      /* SVG edges */
+      .edges-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
+      }
+
+      .edge-path {
+        fill: none;
+        stroke: #475569;
+        stroke-width: 2;
+        transition: stroke 0.2s;
+      }
+
+      .edge-path:hover {
+        stroke: #3b82f6;
+        stroke-width: 3;
+      }
+
+      .edge-arrow {
+        fill: #475569;
+      }
+
+      /* Nodes */
+      .nodes-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      .node {
+        position: absolute;
+        background: #1e293b;
+        border: 2px solid #334155;
+        border-radius: 12px;
+        width: 200px;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .node:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+        transform: translateY(-2px);
+      }
+
+      .node.start {
+        border-color: #10b981;
+      }
+
+      .node.active {
+        border-color: #f59e0b;
+      }
+
+      .node-thumbnail {
+        width: 100%;
+        height: 120px;
+        background: #0f172a;
+        border-radius: 10px 10px 0 0;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .node-thumbnail iframe {
+        width: 1280px;
+        height: 720px;
+        border: none;
+        transform: scale(0.156);
+        transform-origin: 0 0;
+        pointer-events: none;
+      }
+
+      .node-thumbnail .placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        background: linear-gradient(135deg, #1e293b, #334155);
+      }
+
+      .node-content {
+        padding: 12px;
+      }
+
+      .node-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .node-url {
+        font-size: 11px;
+        color: #64748b;
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .node-stats {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+
+      .node-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* Edge labels */
+      .edge-label {
+        position: absolute;
+        background: #334155;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      /* Mini map */
+      .minimap {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 200px;
+        height: 150px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .minimap-viewport {
+        position: absolute;
+        border: 2px solid #3b82f6;
+        background: rgba(59, 130, 246, 0.1);
+      }
+
+      /* Zoom controls */
+      .zoom-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .zoom-btn {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: #1e293b;
+        color: #e2e8f0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+
+      .zoom-btn:hover {
+        background: #334155;
+      }
+
+      .zoom-level {
+        text-align: center;
+        font-size: 11px;
+        color: #94a3b8;
+        padding: 4px;
+      }
+
+      /* Screen detail popup */
+      .detail-popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        width: 800px;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        display: none;
+        z-index: 1000;
+      }
+
+      .detail-popup.visible {
+        display: block;
+      }
+
+      .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        z-index: 999;
+      }
+
+      .popup-overlay.visible {
+        display: block;
+      }
+
+      .popup-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #334155;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .popup-header h2 {
+        font-size: 16px;
+      }
+
+      .popup-close {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 24px;
+        cursor: pointer;
+      }
+
+      .popup-content {
+        display: flex;
+        height: 500px;
+      }
+
+      .popup-preview {
+        flex: 1;
+        background: #0f172a;
+        overflow: auto;
+      }
+
+      .popup-preview iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      .popup-sidebar {
+        width: 300px;
+        border-left: 1px solid #334155;
+        overflow-y: auto;
+      }
+
+      .popup-section {
+        padding: 16px;
+        border-bottom: 1px solid #334155;
+      }
+
+      .popup-section h3 {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+
+      .popup-actions {
+        padding: 16px 20px;
+        border-top: 1px solid #334155;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <h1>🗺️ Sitemap Viewer</h1>
+      <div class="breadcrumb">
+        <a href="/">Home</a> / <span id="projectName">Project</span> /
+        <span id="sectionName">Section</span>
+      </div>
+      <div
+        class="domain-config"
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(0, 0, 0, 0.2);
+          padding: 6px 12px;
+          border-radius: 8px;
+        "
+      >
+        <label style="font-size: 12px; color: #94a3b8">🌐 Domain:</label>
+        <input
+          type="text"
+          id="domainInput"
+          style="
+            background: #1e293b;
+            border: 1px solid #475569;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            width: 280px;
+          "
+          placeholder="https://example.com"
+        />
+        <button
+          onclick="updateDomain()"
+          style="
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+          "
+        >
+          💾
+        </button>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="fitToView()">
+          🎯 Fit to View
+        </button>
+        <button class="btn btn-primary" onclick="openViewer()">
+          👁️ Open Viewer
+        </button>
+      </div>
+    </header>
+
+    <div class="canvas-container" id="canvasContainer">
+      <div class="canvas" id="canvas">
+        <svg class="edges-layer" id="edgesLayer"></svg>
+        <div class="nodes-layer" id="nodesLayer"></div>
+      </div>
+    </div>
+
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomIn()">+</button>
+      <div class="zoom-level" id="zoomLevel">100%</div>
+      <button class="zoom-btn" onclick="zoomOut()">−</button>
+      <button class="zoom-btn" onclick="fitToView()">⊡</button>
+    </div>
+
+    <!-- Detail popup -->
+    <div class="popup-overlay" id="popupOverlay" onclick="closePopup()"></div>
+    <div class="detail-popup" id="detailPopup">
+      <div class="popup-header">
+        <h2 id="popupTitle">Screen Name</h2>
+        <button class="popup-close" onclick="closePopup()">×</button>
+      </div>
+      <div class="popup-content">
+        <div class="popup-preview" id="popupPreview">
+          <iframe id="popupIframe" sandbox="allow-same-origin"></iframe>
+        </div>
+        <div class="popup-sidebar">
+          <div class="popup-section">
+            <h3>📊 Metadata</h3>
+            <div id="popupMetadata"></div>
+          </div>
+          <div class="popup-section">
+            <h3>🖱️ Actions</h3>
+            <div id="popupActions"></div>
+          </div>
+          <div class="popup-section">
+            <h3>🔗 APIs</h3>
+            <div id="popupAPIs"></div>
+          </div>
+        </div>
+      </div>
+      <div class="popup-actions">
+        <button class="btn btn-secondary" onclick="closePopup()">Close</button>
+        <button class="btn btn-primary" onclick="openFullViewer()">
+          Open Full Viewer
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // Parse URL params
+      const urlParams = new URLSearchParams(window.location.search);
+      const projectName = urlParams.get("project");
+      const sectionId = urlParams.get("section");
+
+      document.getElementById("projectName").textContent =
+        projectName || "Unknown";
+      document.getElementById("sectionName").textContent =
+        sectionId || "Unknown";
+
+      // Canvas state
+      let scale = 1;
+      let offsetX = 500;
+      let offsetY = 200;
+      let isDragging = false;
+      let startX, startY;
+
+      let flowData = null;
+      let screensData = [];
+      let nodePositions = {};
+
+      const canvas = document.getElementById("canvas");
+      const container = document.getElementById("canvasContainer");
+
+      // Load data
+      async function loadData() {
+        try {
+          // Load flow
+          const flowResponse = await fetch(
+            `/api/capture/flow/${projectName}/${sectionId}`,
+          );
+          flowData = await flowResponse.json();
+
+          // Load screens
+          const screensResponse = await fetch(
+            `/api/capture/screens/${projectName}/${sectionId}`,
+          );
+          const screensResult = await screensResponse.json();
+          screensData = screensResult.screens || [];
+
+          // Set domain input value
+          const domainInput = document.getElementById("domainInput");
+          if (flowData.domain) {
+            domainInput.value = flowData.domain;
+          }
+
+          calculateLayout();
+          renderNodes();
+          renderEdges();
+        } catch (error) {
+          console.error("Failed to load data:", error);
+        }
+      }
+
+      // Update domain and save to flow.json
+      async function updateDomain() {
+        const newDomain = document.getElementById("domainInput").value.trim();
+        if (!newDomain) return;
+
+        try {
+          const response = await fetch(
+            `/api/capture/update-domain/${projectName}/${sectionId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ domain: newDomain }),
+            },
+          );
+
+          if (response.ok) {
+            flowData.domain = newDomain;
+            alert("✅ Domain updated successfully!");
+          } else {
+            alert("❌ Failed to update domain");
+          }
+        } catch (error) {
+          console.error("Failed to update domain:", error);
+          alert("❌ Error: " + error.message);
+        }
+      }
+
+      // Make updateDomain global
+      window.updateDomain = updateDomain;
+
+      // Calculate node positions (simple tree layout)
+      function calculateLayout() {
+        if (!flowData || !flowData.nodes) return;
+
+        const nodeMap = new Map();
+        flowData.nodes.forEach((n) => nodeMap.set(n.id, n));
+
+        // Build parent-child relationships (support both old format source/target and new format from/to)
+        const children = new Map();
+        flowData.edges?.forEach((edge) => {
+          const source = edge.source || edge.from;
+          const target = edge.target || edge.to;
+          if (!children.has(source)) {
+            children.set(source, []);
+          }
+          children.get(source).push(target);
+        });
+
+        // Layout parameters
+        const nodeWidth = 220;
+        const nodeHeight = 200;
+        const horizontalGap = 100;
+        const verticalGap = 80;
+
+        // BFS to assign positions
+        const queue = [{ id: "start", level: 0, index: 0 }];
+        const levelCounts = {};
+        const visited = new Set();
+
+        while (queue.length > 0) {
+          const { id, level, index } = queue.shift();
+          if (visited.has(id)) continue;
+          visited.add(id);
+
+          if (!levelCounts[level]) levelCounts[level] = 0;
+          const xIndex = levelCounts[level]++;
+
+          nodePositions[id] = {
+            x: xIndex * (nodeWidth + horizontalGap),
+            y: level * (nodeHeight + verticalGap),
+          };
+
+          const nodeChildren = children.get(id) || [];
+          nodeChildren.forEach((childId, i) => {
+            queue.push({ id: childId, level: level + 1, index: i });
+          });
+        }
+      }
+
+      // Render nodes
+      function renderNodes() {
+        const layer = document.getElementById("nodesLayer");
+        layer.innerHTML = "";
+
+        if (!flowData || !flowData.nodes) return;
+
+        flowData.nodes.forEach((node) => {
+          const pos = nodePositions[node.id] || { x: 0, y: 0 };
+          const screenInfo = screensData.find(
+            (s) => s.id === node.id || s.name === node.name,
+          );
+          // Get stats from screenInfo (meta.json stores stats.actions and stats.apis)
+          const actionsCount =
+            screenInfo?.stats?.actions || screenInfo?.actionsCount || 0;
+          const apisCount =
+            screenInfo?.stats?.apis || screenInfo?.apisCount || 0;
+
+          const el = document.createElement("div");
+          el.className = `node ${node.type === "start" ? "start" : ""}`;
+          el.style.left = `${pos.x}px`;
+          el.style.top = `${pos.y}px`;
+          el.onclick = () => showNodeDetail(node.id);
+
+          // Use iframe to show live HTML preview for non-start nodes
+          let thumbnailHtml;
+          if (node.type === "start") {
+            thumbnailHtml = '<div class="placeholder">🚩</div>';
+          } else {
+            thumbnailHtml = `<iframe src="/api/capture/preview/${projectName}/${sectionId}/${node.id}" sandbox="allow-same-origin" loading="lazy"></iframe>`;
+          }
+
+          el.innerHTML = `
+                    <div class="node-thumbnail">${thumbnailHtml}</div>
+                    <div class="node-content">
+                        <div class="node-title">${node.name || node.id}</div>
+                        <div class="node-url">${node.path || node.url || ""}</div>
+                        <div class="node-stats">
+                            <span class="node-stat">🖱️ ${actionsCount}</span>
+                            <span class="node-stat">🔗 ${apisCount}</span>
+                        </div>
+                    </div>
+                `;
+
+          layer.appendChild(el);
+        });
+      }
+
+      // Render edges
+      function renderEdges() {
+        const svg = document.getElementById("edgesLayer");
+        svg.innerHTML = "";
+
+        if (!flowData || !flowData.edges) return;
+
+        // Add arrow marker definition
+        svg.innerHTML = `
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+                    </marker>
+                </defs>
+            `;
+
+        flowData.edges.forEach((edge) => {
+          const sourcePos = nodePositions[edge.source || edge.from];
+          const targetPos = nodePositions[edge.target || edge.to];
+
+          if (!sourcePos || !targetPos) return;
+
+          const nodeWidth = 200;
+          const nodeHeight = 180;
+
+          const x1 = sourcePos.x + nodeWidth / 2;
+          const y1 = sourcePos.y + nodeHeight;
+          const x2 = targetPos.x + nodeWidth / 2;
+          const y2 = targetPos.y;
+
+          // Curved path
+          const midY = (y1 + y2) / 2;
+          const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          path.setAttribute("d", d);
+          path.setAttribute("class", "edge-path");
+          path.setAttribute("marker-end", "url(#arrowhead)");
+          svg.appendChild(path);
+
+          // Add label if exists (clicked text)
+          if (edge.label) {
+            const labelX = (x1 + x2) / 2;
+            const labelY = midY;
+
+            // Background rect for label
+            const bgRect = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "rect",
+            );
+            const textLength = edge.label.length * 7;
+            bgRect.setAttribute("x", labelX - textLength / 2 - 4);
+            bgRect.setAttribute("y", labelY - 10);
+            bgRect.setAttribute("width", textLength + 8);
+            bgRect.setAttribute("height", 18);
+            bgRect.setAttribute("rx", 4);
+            bgRect.setAttribute("fill", "#1e293b");
+            bgRect.setAttribute("stroke", "#475569");
+            svg.appendChild(bgRect);
+
+            // Label text
+            const text = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text",
+            );
+            text.setAttribute("x", labelX);
+            text.setAttribute("y", labelY + 3);
+            text.setAttribute("class", "edge-label");
+            text.setAttribute("text-anchor", "middle");
+            text.textContent = edge.label;
+            svg.appendChild(text);
+          }
+        });
+      }
+
+      // Update canvas transform
+      function updateTransform() {
+        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        document.getElementById("zoomLevel").textContent =
+          `${Math.round(scale * 100)}%`;
+      }
+
+      // Pan handling
+      container.addEventListener("mousedown", (e) => {
+        if (e.target.closest(".node")) return;
+        isDragging = true;
+        startX = e.clientX - offsetX;
+        startY = e.clientY - offsetY;
+        container.style.cursor = "grabbing";
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        offsetX = e.clientX - startX;
+        offsetY = e.clientY - startY;
+        updateTransform();
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDragging = false;
+        container.style.cursor = "grab";
+      });
+
+      // Zoom handling
+      container.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale = Math.min(Math.max(scale * delta, 0.1), 3);
+        updateTransform();
+      });
+
+      function zoomIn() {
+        scale = Math.min(scale * 1.2, 3);
+        updateTransform();
+      }
+
+      function zoomOut() {
+        scale = Math.max(scale * 0.8, 0.1);
+        updateTransform();
+      }
+
+      function fitToView() {
+        // Reset to center
+        offsetX = 500;
+        offsetY = 200;
+        scale = 1;
+        updateTransform();
+      }
+
+      // Show node detail popup
+      async function showNodeDetail(nodeId) {
+        if (nodeId === "start") return;
+
+        document.getElementById("popupOverlay").classList.add("visible");
+        document.getElementById("detailPopup").classList.add("visible");
+        document.getElementById("detailPopup").dataset.nodeId = nodeId;
+
+        const node = flowData.nodes.find((n) => n.id === nodeId);
+        document.getElementById("popupTitle").textContent =
+          node?.name || nodeId;
+
+        // Load preview — use HTML preview endpoint
+        document.getElementById("popupIframe").src =
+          `/api/capture/preview/${projectName}/${sectionId}/${nodeId}`;
+
+        // Load info
+        try {
+          const response = await fetch(
+            `/api/capture/screen-info/${projectName}/${sectionId}/${nodeId}`,
+          );
+          const info = await response.json();
+
+          document.getElementById("popupMetadata").innerHTML = `
+                    <div style="font-size: 12px; color: #94a3b8;">
+                        <div>Type: ${info.metadata?.type || "page"}</div>
+                        <div>URL: ${info.metadata?.url || "-"}</div>
+                    </div>
+                `;
+
+          document.getElementById("popupActions").innerHTML = `
+                    <div style="font-size: 12px; color: #94a3b8;">
+                        ${info.actions?.count || 0} actions recorded
+                    </div>
+                `;
+
+          document.getElementById("popupAPIs").innerHTML = `
+                    <div style="font-size: 12px; color: #94a3b8;">
+                        ${info.apis?.count || 0} API calls captured
+                    </div>
+                `;
+        } catch (error) {
+          console.error("Failed to load node info:", error);
+        }
+      }
+
+      function closePopup() {
+        document.getElementById("popupOverlay").classList.remove("visible");
+        document.getElementById("detailPopup").classList.remove("visible");
+      }
+
+      function openViewer() {
+        window.open(
+          `/viewer.html?project=${projectName}&section=${sectionId}`,
+          "_blank",
+        );
+      }
+
+      function openFullViewer() {
+        const nodeId = document.getElementById("detailPopup").dataset.nodeId;
+        window.open(
+          `/viewer.html?project=${projectName}&section=${sectionId}&screen=${nodeId}`,
+          "_blank",
+        );
+      }
+
+      // Initialize
+      loadData();
+      updateTransform();
+    </script>
+  </body>
+</html>

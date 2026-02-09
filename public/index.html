@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MAPIT - Công cụ testing UI, API, và quản lý tài liệu thông minh">
+  <title>MAPIT - (Sitemap + API + Test)</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/compare.css">
+  <link rel="stylesheet" href="css/ui-enhancements.css">
+  <link rel="stylesheet" href="css/dashboard-features.css">
+  <link rel="stylesheet" href="css/performance-metrics.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Critical inline styles for instant first paint */
+    .app-container { display: flex; flex-direction: column; height: 100vh; }
+    .main-content { display: flex; flex: 1; overflow: hidden; }
+  </style>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1a1a1a">
+  <link rel="stylesheet" href="/css/adaptive-quality.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header" role="banner">
+      <div class="header-left">
+        <h1 class="logo">
+          <span class="logo-icon">🔍</span>
+          MAPITesting Tool
+        </h1>
+      </div>
+      <div class="header-center">
+        <div class="project-selector">
+          <label for="projectSelect">Project:</label>
+          <select id="projectSelect" class="select-input" aria-label="Chọn project">
+            <option value="">-- Chọn Project --</option>
+          </select>
+          <button id="newProjectBtn" class="btn btn-primary btn-sm" aria-label="Tạo project mới">
+            <span>+</span> Tạo mới
+          </button>
+          <button id="deleteProjectBtn" class="btn btn-danger btn-sm" style="display: none;" aria-label="Xóa project">
+            <span>🗑️</span> Xóa
+          </button>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="project-stats" id="projectStats" style="display: none;">
+          <span class="stat">
+            <span class="stat-label">Main:</span>
+            <span class="stat-value" id="mainSize">0 KB</span>
+          </span>
+          <span class="stat">
+            <span class="stat-label">Sections:</span>
+            <span class="stat-value" id="sectionsSize">0 KB</span>
+          </span>
+        </div>
+        <button id="shareProjectBtn" class="btn btn-secondary btn-sm" style="display: none; margin-left: 8px;"
+          title="Share nội bộ" aria-label="Chia sẻ project">
+          Share
+        </button>
+        <button id="importProjectBtn" class="btn btn-secondary btn-sm" style="display: none; margin-left: 4px;"
+          title="Import data" aria-label="Import dữ liệu">
+          Import
+        </button>
+        <!-- Dashboard Feature Actions -->
+        <div class="header-actions" id="headerActions">
+          <!-- Performance Metrics Toggle Button -->
+          <button id="perfMetricsToggleBtn" class="header-action-btn" title="Performance Monitor" aria-label="Performance Monitor" onclick="window.togglePerformanceWidget()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </button>
+
+          <!-- Performance Metrics Widget (ẩn mặc định) -->
+          <div id="performance-metrics" class="perf-widget" style="display: none;"></div>
+
+          <button id="globalSearchBtn" class="header-action-btn" title="Tìm kiếm (Ctrl+K)" aria-label="Global Search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </button>
+          <div class="notification-bell-wrapper" id="notificationBellWrapper">
+            <button id="notificationBellBtn" class="header-action-btn" title="Thông báo" aria-label="Notifications">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span class="notification-badge" id="notificationBadge" style="display:none;">0</span>
+            </button>
+            <div class="notification-panel" id="notificationPanel" style="display:none;">
+              <div class="notification-panel-header">
+                <span class="notification-panel-title">Thông báo</span>
+                <button class="btn btn-ghost btn-xs" id="markAllReadBtn">Đã đọc hết</button>
+              </div>
+              <div class="notification-panel-list" id="notificationList">
+                <div class="empty-state" style="padding:24px;"><p>Không có thông báo</p></div>
+              </div>
+            </div>
+          </div>
+          <button id="themeToggleBtn" class="header-action-btn theme-toggle-btn" title="Đổi giao diện" aria-label="Toggle theme">
+            <svg id="themeIconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+          <button id="shortcutsHelpBtn" class="header-action-btn" title="Phím tắt (Ctrl+/)" aria-label="Keyboard shortcuts">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content" role="main">
+      <!-- Toggle button for left panel (outside panel so it stays visible when collapsed) -->
+      <button id="toggleLeftPanelBtn" class="panel-toggle-btn panel-toggle-left" title="Đóng/Mở sidebar"
+        aria-label="Toggle sidebar">
+        ◀
+      </button>
+
+      <!-- Left Panel - Main Data Tree -->
+      <aside class="panel panel-left" id="leftPanel" role="navigation" aria-label="Main Data Tree">
+        <div class="panel-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h2>📁 Main Data</h2>
+          </div>
+          <button id="testAllMainBtn" class="btn btn-secondary btn-sm" title="Re-test all URLs"
+            aria-label="Test lại tất cả URL">
+            🔄 Test All
+          </button>
+        </div>
+        <div class="panel-content auto-hide-scroll">
+          <div id="mainTree" class="tree-view" role="tree">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                  <path d="M6 12a2 2 0 012-2h10l4 4h14a2 2 0 012 2v20a2 2 0 01-2 2H8a2 2 0 01-2-2V12z"/>
+                  <path d="M18 26l4 4 8-8" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <p>Chon project de xem du lieu</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <div class="resizer" id="resizerLeft" role="separator" aria-label="Resize left panel"></div>
+
+      <!-- Center Panel - Workspace -->
+      <section class="panel panel-center" role="region" aria-label="Workspace">
+        <div class="panel-header">
+          <h2>📊 Workspace</h2>
+          <div class="workspace-tabs" role="tablist">
+            <button class="tab-btn" data-tab="dashboard" role="tab" aria-selected="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>Dashboard
+            </button>
+            <button class="tab-btn active" data-tab="sitemap" role="tab" aria-selected="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;">
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+              </svg>Sitemap
+            </button>
+            <button class="tab-btn" data-tab="preview" role="tab" aria-selected="false">Preview</button>
+            <button class="tab-btn" data-tab="documents" role="tab" aria-selected="false">Documents</button>
+            <div class="tab-group">
+              <button class="tab-btn" data-tab="compare" role="tab" aria-selected="false">So sanh UI</button>
+              <button class="tab-btn" data-tab="api" role="tab" aria-selected="false">API Diff</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <!-- Dashboard Tab Content -->
+          <div id="dashboardTab" class="tab-content" role="tabpanel" style="display: none;">
+            <div class="dashboard-container" id="dashboardContainer">
+              <!-- Quick Actions -->
+              <div class="dashboard-section">
+                <div class="dashboard-section-header">
+                  <h3>Quick Actions</h3>
+                </div>
+                <div class="quick-actions">
+                  <button class="quick-action-btn" id="dashNewCapture" title="Tạo section mới">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="1" y="4" width="22" height="16" rx="2"/><path d="M5 4V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <span>New Capture</span>
+                  </button>
+                  <button class="quick-action-btn" id="dashCompareAll" title="So sánh tất cả">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+                    </svg>
+                    <span>Compare</span>
+                  </button>
+                  <button class="quick-action-btn" id="dashTestAll" title="Test regression tất cả">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/>
+                    </svg>
+                    <span>Run Tests</span>
+                  </button>
+                  <button class="quick-action-btn" id="dashExport" title="Export báo cáo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Export</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Stats Cards -->
+              <div class="dashboard-stats" id="dashboardStats">
+                <div class="stat-card-dashboard">
+                  <div class="stat-card-icon stat-icon-screens">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  </div>
+                  <div class="stat-card-number" id="dashTotalScreens">0</div>
+                  <div class="stat-card-label">Screens</div>
+                </div>
+                <div class="stat-card-dashboard">
+                  <div class="stat-card-icon stat-icon-apis">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  </div>
+                  <div class="stat-card-number" id="dashTotalAPIs">0</div>
+                  <div class="stat-card-label">API Calls</div>
+                </div>
+                <div class="stat-card-dashboard">
+                  <div class="stat-card-icon stat-icon-sections">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  </div>
+                  <div class="stat-card-number" id="dashTotalSections">0</div>
+                  <div class="stat-card-label">Sections</div>
+                </div>
+                <div class="stat-card-dashboard">
+                  <div class="stat-card-icon stat-icon-storage">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  </div>
+                  <div class="stat-card-number" id="dashStorageSize">0 KB</div>
+                  <div class="stat-card-label">Storage</div>
+                </div>
+              </div>
+
+              <!-- Recent Activity -->
+              <div class="dashboard-section">
+                <div class="dashboard-section-header">
+                  <h3>Recent Activity</h3>
+                </div>
+                <div class="activity-timeline" id="activityTimeline">
+                  <div class="empty-state" style="padding:24px;"><p>Chọn project để xem hoạt động</p></div>
+                </div>
+              </div>
+
+              <!-- Test Results Summary -->
+              <div class="dashboard-section">
+                <div class="dashboard-section-header">
+                  <h3>Test Results</h3>
+                  <button class="btn btn-ghost btn-xs" id="dashRunTestsBtn">Run All Tests</button>
+                </div>
+                <div class="test-results-summary" id="testResultsSummary">
+                  <div class="empty-state" style="padding:24px;"><p>Chưa có kết quả test</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sitemap Tab Content -->
+          <div id="sitemapTab" class="tab-content active" role="tabpanel"
+            style="padding: 0; overflow: hidden; position: relative; height: 100%;">
+            <div id="sitemapWorkspace" class="sitemap-workspace"
+              style="width: 100%; height: 100%; position: relative; background: var(--bg-primary); overflow: hidden; cursor: grab;">
+              <div id="workspaceZoomLayer"
+                style="position: absolute; top: 0; left: 0; width: 20000px; height: 20000px; transform-origin: 0 0; transition: transform 0.1s ease-out;">
+                <div id="workspaceNodesContainer"
+                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;"></div>
+                <svg id="workspaceEdgesSvg"
+                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible;"></svg>
+              </div>
+            </div>
+            <div class="sitemap-overlay-tools"
+              style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px; align-items: center;">
+              <div class="search-box"
+                style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid var(--border-color); display: flex; align-items: center;">
+                <span style="font-size: 12px; margin-right: 4px;">🔍</span>
+                <input type="text" id="sitemapSearchInput" placeholder="Find screen..."
+                  style="border: none; outline: none; font-size: 12px; width: 120px; color: var(--text-primary); background: transparent;"
+                  aria-label="Tìm screen trên sitemap">
+              </div>
+              <div class="zoom-controls"
+                style="display: flex; gap: 4px; background: var(--bg-secondary); padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                <button id="zoomInBtn" class="btn btn-secondary btn-xs" title="Zoom In" aria-label="Phóng to">➕</button>
+                <button id="zoomOutBtn" class="btn btn-secondary btn-xs" title="Zoom Out" aria-label="Thu nhỏ">➖</button>
+                <button id="zoomFitBtn" class="btn btn-secondary btn-xs" title="Center View" aria-label="Canh giữa">🎯</button>
+              </div>
+              <button id="resetWorkspaceSitemapBtn" class="btn btn-secondary btn-xs" style="display: none;">🔄 Reset
+                Layout</button>
+            </div>
+          </div>
+
+          <!-- Preview Tab Content -->
+          <div id="previewTab" class="workspace tab-content" role="tabpanel" style="display: none;">
+            <div id="previewContent">
+              <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>Chọn một URL từ Main hoặc Section để xem chi tiết</p>
+              </div>
+            </div>
+            <div id="apiContent" class="api-preview-content" style="display: none;"></div>
+          </div>
+
+          <!-- Compare Tab Content -->
+          <div id="compareTab" class="tab-content" role="tabpanel" style="display: none;">
+            <div class="compare-selectors">
+              <select id="compareSection1" aria-label="Chọn Section 1 để so sánh">
+                <option value="">-- Chọn Section 1 --</option>
+              </select>
+              <select id="compareSection2" aria-label="Chọn Section 2 để so sánh">
+                <option value="">-- Chọn Section 2 --</option>
+              </select>
+            </div>
+            <div id="compareResults" class="compare-results">
+              <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <p>Chọn 2 Section để so sánh UI</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Documents Tab Content -->
+          <div id="documentsTab" class="tab-content" role="tabpanel" style="display: none;">
+            <div class="doc-toolbar">
+              <div class="doc-toolbar-left">
+                <label class="btn btn-primary btn-sm doc-upload-btn">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="vertical-align:-2px">
+                    <path d="M8 1v10M4 5l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                      stroke-linejoin="round" />
+                    <path d="M2 12v2h12v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                      stroke-linejoin="round" />
+                  </svg>
+                  Upload
+                  <input type="file" id="docFileInput" accept=".docx,.xlsx,.xls,.pdf,.txt,.csv" multiple
+                    style="display:none" onchange="handleDocUpload(this)">
+                </label>
+                <span class="doc-count" id="docCount"></span>
+              </div>
+              <div class="doc-toolbar-right">
+                <input type="text" id="docSearchInput" class="doc-search" placeholder="Tìm tài liệu..."
+                  aria-label="Tìm kiếm tài liệu">
+              </div>
+            </div>
+
+            <!-- Drop zone -->
+            <div id="docDropZone" class="doc-drop-zone">
+              <div class="doc-drop-content">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="opacity:0.3">
+                  <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" />
+                  <path d="M16 18h16M16 24h16M16 30h10" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" />
+                  <path d="M24 38v8M20 42l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
+                <p>Kéo thả file vào đây hoặc nhấn Upload</p>
+                <span class="doc-drop-hint">Hỗ trợ: DOCX, XLSX, PDF, TXT, CSV (tối đa 50MB)</span>
+              </div>
+            </div>
+
+            <!-- Document list -->
+            <div id="docList" class="doc-list"></div>
+
+            <!-- Document detail/preview panel -->
+            <div id="docDetail" class="doc-detail" style="display:none">
+              <div class="doc-detail-header">
+                <button class="btn btn-ghost btn-sm" onclick="closeDocDetail()" aria-label="Quay lại">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M10 2L4 8l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                      stroke-linejoin="round" />
+                  </svg>
+                  Quay lại
+                </button>
+                <h3 id="docDetailName"></h3>
+                <div class="doc-detail-actions">
+                  <button class="btn btn-danger btn-xs" onclick="deleteCurrentDoc()" aria-label="Xóa tài liệu">Xóa</button>
+                </div>
+              </div>
+
+              <!-- Version list -->
+              <div class="doc-versions" id="docVersions"></div>
+
+              <!-- Preview area -->
+              <div class="doc-preview-area" id="docPreviewArea">
+                <div class="empty-state">
+                  <p>Chọn version để xem preview</p>
+                </div>
+              </div>
+
+              <!-- Compare area -->
+              <div class="doc-compare-area" id="docCompareArea" style="display:none">
+                <div class="doc-compare-header">
+                  <h4>So sánh version</h4>
+                  <button class="btn btn-ghost btn-xs" onclick="closeDocCompare()" aria-label="Đóng so sánh">Đóng</button>
+                </div>
+                <div class="doc-compare-stats" id="docCompareStats"></div>
+                <div class="doc-compare-diff" id="docCompareDiff"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- API Tab Content -->
+          <div id="apiTab" class="tab-content" role="tabpanel" style="display: none;">
+            <div class="compare-selectors">
+              <select id="apiSection1" aria-label="Chọn Section 1 cho API Diff">
+                <option value="">-- Chọn Section 1 --</option>
+              </select>
+              <select id="apiSection2" aria-label="Chọn Section 2 cho API Diff">
+                <option value="">-- Chọn Section 2 --</option>
+              </select>
+            </div>
+            <div id="apiResults" class="compare-results">
+              <div class="empty-state">
+                <div class="empty-icon">🔗</div>
+                <p>Chọn 2 Section để so sánh API</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel - Capture Tools & Sections -->
+      <div class="resizer" id="resizerRight" role="separator" aria-label="Resize right panel"></div>
+      <aside class="panel panel-right" id="rightPanel" role="complementary" aria-label="Sections & Capture Tools">
+        <!-- Capture Tools (shown during capture) -->
+        <div id="captureToolsPanel" class="capture-tools-panel" style="display: none;">
+          <div class="panel-header">
+            <h2>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="vertical-align: -2px;">
+                <rect x="1" y="4" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+                <path d="M5 4V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3" />
+                <circle cx="8" cy="9" r="2.5" stroke="currentColor" stroke-width="1.3" />
+              </svg>
+              Capture Tools
+            </h2>
+            <button id="stopCaptureToolBtn" class="btn btn-danger btn-sm" aria-label="Dừng capture">
+              &#9632; Dừng
+            </button>
+          </div>
+          <div class="panel-content">
+            <div class="capture-info-box">
+              <div class="info-item">
+                <span class="label">URL:</span>
+                <span id="currentCaptureUrl" class="value">-</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Project:</span>
+                <span id="currentCaptureProject" class="value">-</span>
+              </div>
+            </div>
+
+            <div class="capture-stats-box">
+              <div class="stat-card">
+                <div class="stat-number" id="captureScreensCount">0</div>
+                <div class="stat-label">SCREENS</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="captureActionsCount">0</div>
+                <div class="stat-label">ACTIONS</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="captureApisCount">0</div>
+                <div class="stat-label">APIS</div>
+              </div>
+            </div>
+
+            <div class="capture-hint">
+              <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                <strong>Hướng dẫn:</strong><br>
+                &#8226; Nhấn <kbd>ESC</kbd> để chụp màn hình<br>
+                &#8226; Thao tác bình thường trên trang web<br>
+                &#8226; Nhấn "Dừng" khi hoàn tất
+              </div>
+              <button id="manualCaptureBtn" class="btn btn-primary" style="width: 100%; margin-top: 8px;"
+                aria-label="Chụp màn hình thủ công">
+                📸 Chụp màn hình thủ công
+              </button>
+            </div>
+
+            <div id="capturedScreensList" class="captured-screens-list">
+              <div class="list-header">Captured:</div>
+              <div id="capturedScreensItems" class="screens-items">
+                <!-- Screens will be added here dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sections List (shown when not capturing) -->
+        <div id="sectionsPanel" class="sections-panel">
+          <div class="panel-header">
+            <h2>📦 Sections</h2>
+            <div style="display: flex; gap: 6px;">
+              <button id="authConfigBtn" class="btn btn-secondary btn-sm" title="Cấu hình Login cho Replay"
+                onclick="openCredentialsModal()" aria-label="Cấu hình đăng nhập">
+                🔐
+              </button>
+              <button id="newSectionBtn" class="btn btn-primary btn-sm" aria-label="Tạo section mới">
+                <span>+</span> New Section
+              </button>
+            </div>
+          </div>
+          <div class="panel-content auto-hide-scroll">
+            <div id="sectionsList" class="sections-list">
+              <div class="empty-state">
+                <div class="empty-icon">📦</div>
+                <p>Chưa có section nào</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Capture Status Bar (deprecated - hidden) -->
+    <div id="captureBar" class="capture-bar" style="display: none;" aria-hidden="true">
+      <div class="capture-info">
+        <span class="capture-icon pulse"
+          style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;"></span>
+        <span class="capture-text">Capturing: <span id="captureUrl"></span></span>
+        <span class="capture-stats">
+          <span id="capturedPages">0</span> pages |
+          <span id="capturedRequests">0</span> requests
+        </span>
+      </div>
+      <button id="stopCaptureBtn" class="btn btn-danger btn-sm">&#9632; Dừng</button>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <!-- New Project Modal -->
+  <div id="newProjectModal" class="modal" role="dialog" aria-labelledby="newProjectModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="newProjectModalTitle">Tạo Project Mới</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="projectNameInput">Tên Project:</label>
+          <input type="text" id="projectNameInput" class="input" placeholder="vd: my-website-test">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Hủy</button>
+        <button id="createProjectBtn" class="btn btn-primary">Tạo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Section Modal -->
+  <div id="newSectionModal" class="modal" role="dialog" aria-labelledby="newSectionModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="newSectionModalTitle">Tạo Section Mới</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="startUrlInput">URL bắt đầu:</label>
+          <input type="url" id="startUrlInput" class="input" placeholder="https://example.com"
+            list="urlHistoryDataList">
+          <datalist id="urlHistoryDataList"></datalist>
+        </div>
+        <div id="urlHistoryContainer" class="url-history-container" style="margin-top: 12px; display: none;">
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Gần
+            đây:</label>
+          <div id="urlHistoryList" class="url-history-list"
+            style="display: flex; flex-direction: column; gap: 4px;">
+          </div>
+        </div>
+        <p class="hint" style="margin-top: 16px;">Trình duyệt sẽ mở để bạn thao tác. Đóng trình duyệt khi hoàn tất
+          để lưu dữ liệu.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Hủy</button>
+        <button id="startCaptureBtn" class="btn btn-primary">Bắt đầu Capture</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compare Modal -->
+  <div id="compareModal" class="modal modal-large" role="dialog" aria-labelledby="compareModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="compareModalTitle">Kết quả So sánh</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="compareModalResults" class="compare-results"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Merge Modal -->
+  <div id="mergeModal" class="modal" role="dialog" aria-labelledby="mergeModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="mergeModalTitle">⬆️ Merge Section → Main</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+          Chọn screens muốn merge vào Main. Dữ liệu đã có trong Main sẽ được ghi đè.
+        </div>
+        <div id="mergeFolderList" class="merge-folder-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;"></div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="deleteAfterMerge" style="accent-color: var(--accent-primary);">
+            <span>Xóa Section sau khi merge thành công</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Hủy</button>
+        <button id="confirmMergeBtn" class="btn btn-primary">Merge</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div id="shareModal" class="modal" role="dialog" aria-labelledby="shareModalTitle">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="shareModalTitle">Chia sẻ nội bộ</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="shareNetworkInfo"
+          style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted);">WiFi</div>
+              <div id="shareWifiName" style="font-size: 14px; font-weight: 600;">--</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; color: var(--text-muted);">IP nội bộ</div>
+              <div id="shareIpList" style="font-size: 14px; font-weight: 600;">--</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Chọn dữ liệu muốn chia sẻ:</div>
+        <div id="shareItemList"
+          style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+        </div>
+        <div id="shareLinkArea" style="display: none; margin-top: 12px;">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Link chia sẻ (gửi cho người cùng
+            WiFi):</div>
+          <div id="shareLinksContainer"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Đóng</button>
+        <button id="createShareBtn" class="btn btn-primary">Chia sẻ mục đã chọn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div id="importModal" class="modal" role="dialog" aria-labelledby="importModalTitle">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="importModalTitle">Import Data</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab buttons -->
+        <div style="display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+          <button class="import-tab-btn active" data-tab="link"
+            style="padding: 8px 16px; background: none; border: none; color: var(--text-primary); cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px;">Share
+            Link</button>
+          <button class="import-tab-btn" data-tab="file"
+            style="padding: 8px 16px; background: none; border: none; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px;">File
+            ZIP</button>
+          <button class="import-tab-btn" data-tab="gdrive"
+            style="padding: 8px 16px; background: none; border: none; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px;">Google
+            Drive</button>
+          <button class="import-tab-btn" data-tab="scan"
+            style="padding: 8px 16px; background: none; border: none; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px;">Tìm
+            mạng</button>
+        </div>
+
+        <!-- Tab: Share Link -->
+        <div id="importTabLink" class="import-tab-content">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Share
+              URL</label>
+            <input type="text" id="importShareUrl" class="text-input"
+              placeholder="http://192.168.x.x:8888/share/abc123" style="width: 100%;">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Import
+              vào</label>
+            <select id="importTargetType" class="select-input" style="width: 100%;">
+              <option value="section">Section mới</option>
+              <option value="main">Main Data (ghi đè)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tab: File Upload -->
+        <div id="importTabFile" class="import-tab-content" style="display: none;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Chọn file
+              ZIP</label>
+            <input type="file" id="importFileInput" accept=".zip,.tar.gz" style="width: 100%;">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Import
+              vào</label>
+            <select id="importFileTargetType" class="select-input" style="width: 100%;">
+              <option value="section">Section mới</option>
+              <option value="main">Main Data (ghi đè)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tab: Network Scan -->
+        <div id="importTabScan" class="import-tab-content" style="display: none;">
+          <button id="scanNetworkBtn" class="btn btn-secondary btn-sm" style="margin-bottom: 12px;">Tìm kiếm máy trong
+            mạng...</button>
+          <div id="scanResults" style="max-height: 250px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- Tab: Google Drive -->
+        <div id="importTabGdrive" class="import-tab-content" style="display: none;">
+          <div id="gdriveSetupSection">
+            <!-- Status -->
+            <div id="gdriveStatus"
+              style="padding: 10px 12px; background: var(--bg-tertiary); border-radius: 6px; margin-bottom: 12px; font-size: 13px;">
+              Đang kiểm tra...
+            </div>
+
+            <!-- Auth button -->
+            <div id="gdriveAuthSection"
+              style="display: none; margin-bottom: 12px; text-align: center;">
+              <button class="btn btn-primary btn-sm" onclick="authGDrive()" style="padding: 10px 24px;">Kết nối Google
+                Drive</button>
+            </div>
+
+            <!-- Connected: Upload & Browse -->
+            <div id="gdriveConnected" style="display: none;">
+              <!-- Upload to Drive -->
+              <div
+                style="margin-bottom: 12px; padding: 10px 12px; background: var(--bg-tertiary); border-radius: 6px;">
+                <div style="font-size: 12px; font-weight: 500; margin-bottom: 8px;">Tải lên Drive</div>
+                <div id="gdriveUploadOptions" style="margin-bottom: 8px;"></div>
+                <button class="btn btn-primary btn-sm" onclick="uploadToDrive()">Upload lên Drive</button>
+              </div>
+
+              <!-- Drive files -->
+              <div style="margin-bottom: 12px;">
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 12px; font-weight: 500;">Files trên Drive</span>
+                  <button class="btn btn-secondary btn-xs" onclick="listDriveFiles()">Làm mới</button>
+                </div>
+                <div id="gdriveFileList"
+                  style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                </div>
+              </div>
+
+              <!-- Import from Drive Link -->
+              <div style="padding: 10px 12px; background: var(--bg-tertiary); border-radius: 6px;">
+                <div style="font-size: 12px; font-weight: 500; margin-bottom: 8px;">Import từ Drive Link</div>
+                <input type="text" id="gdriveLinkInput" class="text-input"
+                  placeholder="https://drive.google.com/file/d/.../view"
+                  style="width: 100%; font-size: 12px; margin-bottom: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <select id="gdriveLinkTargetType" class="select-input" style="font-size: 12px;">
+                    <option value="section">Section mới</option>
+                    <option value="main">Main Data (ghi đè)</option>
+                  </select>
+                  <button class="btn btn-primary btn-sm" onclick="importFromDriveLink()">Import</button>
+                </div>
+              </div>
+
+              <!-- Disconnect -->
+              <div style="margin-top: 12px; text-align: right;">
+                <button class="btn btn-danger btn-xs" onclick="disconnectGDrive()">Ngắt kết nối Drive</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Import progress -->
+        <div id="importProgress"
+          style="display: none; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; margin-top: 8px;">
+          <div style="font-size: 13px;" id="importProgressText">Đang import...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Đóng</button>
+        <button id="confirmImportBtn" class="btn btn-primary">Import</button>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- Global Search Overlay -->
+  <div id="searchOverlay" class="search-overlay" style="display:none;" role="dialog" aria-label="Global Search">
+    <div class="search-overlay-backdrop" id="searchOverlayBackdrop"></div>
+    <div class="search-overlay-content">
+      <div class="search-input-wrapper">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-input-icon">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="globalSearchInput" class="search-input" placeholder="Search projects, sections, screens..." autocomplete="off">
+        <kbd class="search-kbd">ESC</kbd>
+      </div>
+      <div class="search-results" id="searchResults">
+        <div class="search-recent" id="searchRecent">
+          <div class="search-result-group-header">Recent Searches</div>
+          <div id="searchRecentList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Modal -->
+  <div id="shortcutsModal" class="modal shortcuts-modal" role="dialog" aria-labelledby="shortcutsModalTitle" style="display: none;">
+    <div class="modal-content" style="max-width:520px;">
+      <div class="modal-header">
+        <h3 id="shortcutsModalTitle">Keyboard Shortcuts</h3>
+        <button class="modal-close" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <table class="shortcuts-table">
+          <tbody>
+            <tr class="shortcuts-category"><td colspan="2">Navigation</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Global Search</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>1</kbd></td><td>Dashboard Tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>2</kbd></td><td>Sitemap Tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>3</kbd></td><td>Preview Tab</td></tr>
+            <tr class="shortcuts-category"><td colspan="2">Actions</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>N</kbd></td><td>New Project</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Start Capture</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>E</kbd></td><td>Stop Capture</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>D</kbd></td><td>Compare</td></tr>
+            <tr class="shortcuts-category"><td colspan="2">General</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close Modal / Search</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>/</kbd></td><td>Show Shortcuts</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Operations Toolbar -->
+  <div id="bulkToolbar" class="bulk-toolbar" style="display:none;">
+    <div class="bulk-toolbar-inner">
+      <span class="bulk-count" id="bulkCount">0 selected</span>
+      <div class="bulk-actions">
+        <button class="btn btn-secondary btn-sm" id="bulkSelectAll">Select All</button>
+        <button class="btn btn-secondary btn-sm" id="bulkDeselectAll">Deselect All</button>
+        <button class="btn btn-primary btn-sm" id="bulkMerge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="17 11 12 6 7 11"/><line x1="12" y1="18" x2="12" y2="6"/></svg>
+          Merge
+        </button>
+        <button class="btn btn-danger btn-sm" id="bulkDelete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="js/app.js"></script>
+  <script src="js/tree-view.js"></script>
+  <script src="js/diff-viewer.js"></script>
+  <script src="js/preview.js"></script>
+
+  <!-- Performance & Memory Utils -->
+  <script src="/js/utils/memory-monitor.js"></script>
+  <script src="/js/utils/indexed-db.js"></script>
+  <script src="/js/utils/progressive-renderer.js"></script>
+  <script src="/js/utils/performance-utils.js"></script>
+  <script src="/js/utils/device-detector.js"></script>
+
+  <!-- Resource Pooling -->
+  <script src="/js/utils/object-pool.js"></script>
+  <script src="/js/utils/dom-pool.js"></script>
+  <script src="/js/utils/canvas-pool.js"></script>
+  <script src="/js/utils/worker-pool.js"></script>
+  <script src="/js/utils/image-pool.js"></script>
+
+  <!-- Pagination & PWA -->
+  <script src="/js/pagination.js"></script>
+  <script src="/js/sw-register.js"></script>
+
+  <!-- Adaptive Quality -->
+  <script src="/js/adaptive-quality.js"></script>
+  <script src="/js/quality-settings-ui.js"></script>
+  <script src="/js/utils/performance-optimizer.js"></script>
+
+  <!-- Lazy Loader -->
+  <script src="/js/lazy-loader.js"></script>
+
+  <script src="js/compare-view.js"></script>
+  <script src="js/document-compare.js"></script>
+  <script src="js/ux-enhancements.js"></script>
+  <script src="js/dashboard-features.js"></script>
+  <script src="js/test-runner-ui.js"></script>
+  <script src="js/report-ui.js"></script>
+  <script src="js/version-ui.js"></script>
+  <script src="js/comment-ui.js"></script>
+  <script src="js/theme-manager.js"></script>
+  <script src="js/theme-customization.js"></script>
+</body>
+
+</html>

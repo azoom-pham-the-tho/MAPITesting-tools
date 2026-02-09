@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Performance Optimizer - Test Page</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 24px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { margin-bottom: 24px; color: #fff; }
+    .test-controls {
+      background: #2a2a2a;
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #b0b0b0;
+    }
+    button {
+      background: #1890ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #40a9ff; }
+    button.danger {
+      background: #ff4d4f;
+    }
+    button.danger:hover {
+      background: #ff7875;
+    }
+    .metrics-display {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-card {
+      background: #2a2a2a;
+      padding: 16px;
+      border-radius: 8px;
+      border: 2px solid #333;
+    }
+    .metric-card.warning {
+      border-color: #faad14;
+    }
+    .metric-card.critical {
+      border-color: #ff4d4f;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #52c41a;
+    }
+    .metric-value.warning { color: #faad14; }
+    .metric-value.critical { color: #ff4d4f; }
+    .log-container {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Monaco', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin-bottom: 4px;
+      padding: 4px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .log-entry.info { color: #4fc3f7; }
+    .log-entry.warning { color: #faad14; }
+    .log-entry.error { color: #ff4d4f; }
+    .log-entry.success { color: #52c41a; }
+    .stress-canvas {
+      width: 100%;
+      height: 400px;
+      background: #2a2a2a;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Performance Optimizer - Test Page</h1>
+
+    <!-- Metrics Display -->
+    <div class="metrics-display">
+      <div class="metric-card" id="fps-card">
+        <div class="metric-label">FPS</div>
+        <div class="metric-value" id="fps-display">--</div>
+      </div>
+      <div class="metric-card" id="lag-card">
+        <div class="metric-label">Lag %</div>
+        <div class="metric-value" id="lag-display">--</div>
+      </div>
+      <div class="metric-card" id="memory-card">
+        <div class="metric-label">Memory</div>
+        <div class="metric-value" id="memory-display">--</div>
+      </div>
+      <div class="metric-card" id="quality-card">
+        <div class="metric-label">Quality Tier</div>
+        <div class="metric-value" id="quality-display">--</div>
+      </div>
+    </div>
+
+    <!-- Test Controls -->
+    <div class="test-controls">
+      <h3 style="margin-bottom: 16px;">🎮 Test Controls</h3>
+
+      <div class="control-group">
+        <label>Quality Mode:</label>
+        <button onclick="setQuality('auto')">Auto Mode</button>
+        <button onclick="setQuality('low')">Low</button>
+        <button onclick="setQuality('medium')">Medium</button>
+        <button onclick="setQuality('high')">High</button>
+      </div>
+
+      <div class="control-group">
+        <label>Stress Test (Simulate Load):</label>
+        <button onclick="startStress('light')">Light Stress</button>
+        <button onclick="startStress('medium')">Medium Stress</button>
+        <button onclick="startStress('heavy')">Heavy Stress</button>
+        <button class="danger" onclick="stopStress()">Stop Stress</button>
+      </div>
+
+      <div class="control-group">
+        <label>Memory Test:</label>
+        <button onclick="allocateMemory(10)">+10MB</button>
+        <button onclick="allocateMemory(50)">+50MB</button>
+        <button onclick="allocateMemory(100)">+100MB</button>
+        <button class="danger" onclick="clearMemory()">Clear Memory</button>
+      </div>
+
+      <div class="control-group">
+        <label>Optimizer Control:</label>
+        <button onclick="resetOptimizer()">Reset to Auto</button>
+        <button onclick="getMetrics()">Log Metrics</button>
+        <button class="danger" onclick="clearLogs()">Clear Logs</button>
+      </div>
+    </div>
+
+    <!-- Stress Test Canvas -->
+    <canvas id="stressCanvas" class="stress-canvas"></canvas>
+
+    <!-- Logs -->
+    <h3 style="margin: 24px 0 12px 0;">📜 Event Logs</h3>
+    <div class="log-container" id="logContainer">
+      <div class="log-entry info">Waiting for performance optimizer...</div>
+    </div>
+  </div>
+
+  <!-- Load Performance Optimizer -->
+  <script src="/js/utils/performance-utils.js"></script>
+  <script src="/js/utils/memory-monitor.js"></script>
+  <script src="/js/adaptive-quality.js"></script>
+  <script src="/js/quality-settings-ui.js"></script>
+  <script src="/js/utils/performance-optimizer.js"></script>
+
+  <!-- Test Script -->
+  <script>
+    // Global state
+    let stressInterval = null;
+    let stressLevel = 0;
+    let memoryLeaks = [];
+
+    // Wait for optimizer to initialize
+    setTimeout(() => {
+      if (window.performanceOptimizer) {
+        log('Performance Optimizer loaded successfully', 'success');
+        startMetricsDisplay();
+        setupEventListeners();
+      } else {
+        log('ERROR: Performance Optimizer not found!', 'error');
+      }
+    }, 2000);
+
+    // Setup event listeners
+    function setupEventListeners() {
+      window.addEventListener('qualityChanged', (e) => {
+        log(`Quality changed: ${e.detail.quality}`, 'info');
+      });
+
+      window.addEventListener('performanceOptimized', (e) => {
+        log(`Auto-optimized to ${e.detail.tier}: ${e.detail.reason}`, 'warning');
+      });
+    }
+
+    // Start metrics display
+    function startMetricsDisplay() {
+      setInterval(() => {
+        if (!window.performanceOptimizer) return;
+
+        const metrics = window.performanceOptimizer.getMetrics();
+
+        // Update FPS
+        document.getElementById('fps-display').textContent = metrics.avgFPS;
+        document.getElementById('fps-display').className =
+          metrics.avgFPS < 45 ? 'metric-value critical' : 'metric-value';
+        document.getElementById('fps-card').className =
+          metrics.avgFPS < 45 ? 'metric-card critical' : 'metric-card';
+
+        // Update Lag
+        document.getElementById('lag-display').textContent = metrics.lagPercentage + '%';
+        document.getElementById('lag-display').className =
+          metrics.lagPercentage > 15 ? 'metric-value warning' : 'metric-value';
+        document.getElementById('lag-card').className =
+          metrics.lagPercentage > 15 ? 'metric-card warning' : 'metric-card';
+
+        // Update Memory
+        document.getElementById('memory-display').textContent = metrics.memoryUsage + '%';
+        document.getElementById('memory-display').className =
+          metrics.memoryUsage > 70 ? 'metric-value critical' : 'metric-value';
+        document.getElementById('memory-card').className =
+          metrics.memoryUsage > 70 ? 'metric-card critical' : 'metric-card';
+
+        // Update Quality
+        const qualityColors = { low: 'critical', medium: 'warning', high: '' };
+        document.getElementById('quality-display').textContent = metrics.currentTier.toUpperCase();
+        document.getElementById('quality-display').className =
+          'metric-value ' + (qualityColors[metrics.currentTier] || '');
+
+      }, 500);
+    }
+
+    // Quality control
+    function setQuality(quality) {
+      if (quality === 'auto') {
+        window.performanceOptimizer.resetToAuto();
+        log('Switched to AUTO mode', 'success');
+      } else {
+        window.performanceOptimizer.forceQuality(quality);
+        log(`Switched to ${quality.toUpperCase()} mode (manual)`, 'success');
+      }
+    }
+
+    // Stress test
+    function startStress(level) {
+      stopStress();
+
+      const canvas = document.getElementById('stressCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      const particles = [];
+      const particleCount = level === 'light' ? 100 : level === 'medium' ? 500 : 2000;
+
+      // Create particles
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          radius: Math.random() * 3 + 1,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`
+        });
+      }
+
+      log(`Started ${level} stress test (${particleCount} particles)`, 'warning');
+
+      stressInterval = setInterval(() => {
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+
+          if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+        });
+      }, 16);
+    }
+
+    function stopStress() {
+      if (stressInterval) {
+        clearInterval(stressInterval);
+        stressInterval = null;
+        log('Stopped stress test', 'info');
+      }
+    }
+
+    // Memory test
+    function allocateMemory(mb) {
+      const size = mb * 1024 * 1024 / 8; // 8 bytes per number
+      const leak = new Float64Array(size);
+      memoryLeaks.push(leak);
+      log(`Allocated ${mb}MB (total leaks: ${memoryLeaks.length})`, 'warning');
+    }
+
+    function clearMemory() {
+      memoryLeaks = [];
+      log('Cleared memory leaks', 'success');
+      if (window.gc) {
+        window.gc();
+        log('Forced garbage collection', 'info');
+      }
+    }
+
+    // Optimizer control
+    function resetOptimizer() {
+      window.performanceOptimizer.resetToAuto();
+      log('Reset optimizer to AUTO mode', 'success');
+    }
+
+    function getMetrics() {
+      const metrics = window.performanceOptimizer.getMetrics();
+      log('Current Metrics: ' + JSON.stringify(metrics, null, 2), 'info');
+    }
+
+    // Logging
+    function log(message, type = 'info') {
+      const container = document.getElementById('logContainer');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      container.insertBefore(entry, container.firstChild);
+
+      // Keep only last 50 logs
+      while (container.children.length > 50) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    function clearLogs() {
+      document.getElementById('logContainer').innerHTML =
+        '<div class="log-entry info">Logs cleared</div>';
+    }
+
+    // Initial log
+    log('Test page loaded. Initializing...', 'info');
+  </script>
+</body>
+</html>
