@@ -48,6 +48,7 @@ class DocumentService {
                 baseName,
                 ext,
                 type: fileType,
+                category: 'uncategorized', // Default category
                 versions: [],
                 createdAt: new Date().toISOString()
             };
@@ -87,6 +88,19 @@ class DocumentService {
         await fs.writeJson(path.join(this.getDocPath(projectName, docId), 'meta.json'), meta, { spaces: 2 });
 
         return { id: docId, version, name: originalName, type: fileType };
+    }
+
+    // Update document category
+    async updateCategory(projectName, docId, category) {
+        const metaPath = path.join(this.getDocPath(projectName, docId), 'meta.json');
+        if (!await fs.pathExists(metaPath)) {
+            throw new Error('Document not found');
+        }
+        const meta = await fs.readJson(metaPath);
+        meta.category = category;
+        meta.updatedAt = new Date().toISOString();
+        await fs.writeJson(metaPath, meta, { spaces: 2 });
+        return meta;
     }
 
     // List all documents for a project
@@ -143,17 +157,23 @@ class DocumentService {
         if (meta.type === 'word') {
             const mammoth = require('mammoth');
             const result = await mammoth.convertToHtml({ path: filePath });
-            return { type: 'html', content: result.value };
+            return { type: 'html', content: result.value, totalLength: result.value.length };
         }
 
         if (meta.type === 'excel') {
             const XLSX = require('xlsx');
             const workbook = XLSX.readFile(filePath);
+            const sheetNames = workbook.SheetNames;
+            const sheetInfo = {};
             const sheets = {};
-            for (const name of workbook.SheetNames) {
-                sheets[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+            for (const name of sheetNames) {
+                const allRows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+                // Send first batch + total count so frontend can lazy load
+                const INITIAL_ROWS = 50;
+                sheets[name] = allRows.slice(0, INITIAL_ROWS);
+                sheetInfo[name] = { totalRows: allRows.length, colCount: allRows.reduce((m, r) => Math.max(m, r.length), 0) };
             }
-            return { type: 'excel', sheets, sheetNames: workbook.SheetNames };
+            return { type: 'excel', sheets, sheetNames, sheetInfo };
         }
 
         if (meta.type === 'pdf') {
@@ -162,7 +182,9 @@ class DocumentService {
         }
 
         if (meta.type === 'text' || meta.type === 'csv') {
-            const content = await fs.readFile(filePath, 'utf8');
+            let content = await fs.readFile(filePath, 'utf8');
+            // Strip UTF-8 BOM if present
+            if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
             return { type: 'text', content };
         }
 
@@ -170,9 +192,18 @@ class DocumentService {
     }
 
     // Compare two versions
-    async compareVersions(projectName, docId, v1, v2) {
+    async compareVersions(projectName, docId, v1, v2, force = false) {
         const meta = await this.getDocument(projectName, docId);
 
+        // Get meta info for versions
+        const metaV1 = meta.versions.find(v => v.version === v1);
+        const metaV2 = meta.versions.find(v => v.version === v2);
+
+        // Quick check for different file formats
+        // We assume file extension stored in 'originalName' property if available, or try to infer
+        // For simplicity, we can check the file paths or store extension in version meta (which we should do ideally)
+        // Here we'll read the files first (as we need stats anyway) and check extensions if possible
+        
         const v1Path = path.join(this.getVersionPath(projectName, docId, v1), 'extracted.txt');
         const v2Path = path.join(this.getVersionPath(projectName, docId, v2), 'extracted.txt');
 
@@ -180,37 +211,126 @@ class DocumentService {
             throw new Error('Khong the so sanh: chua extract duoc text tu 1 hoac 2 version');
         }
 
-        const text1 = await fs.readFile(v1Path, 'utf8');
-        const text2 = await fs.readFile(v2Path, 'utf8');
+        let text1 = await fs.readFile(v1Path, 'utf8');
+        let text2 = await fs.readFile(v2Path, 'utf8');
+
+        // Simple format detection via first line or content heuristics if meta doesn't help
+        // But better rely on meta if we stored it properly. Let's assume we proceed to content check.
+        // Heuristic: If one looks like CSV and other like Prose, or huge size diff
+        
+        // Detect significant structural difference or format mismatch
+        // For now, let's use a simple size/line-count heuristic for "Overview Mode"
+        // In real app, we should check file extensions from upload metadata
+        
+        // --- OVERVIEW MODE Check ---
+        // If not forced, and (Length diff > 50% OR Line count diff > 50%), suggest Overview
+        // Or if we explicitly stored format/ext in version meta (we added 'ext' to doc meta, but versions might differ in update?)
+        // Let's assume versions can be different formats (e.g. v1 docx, v2 pdf)
+        
+        // NOTE: In current upload(), we don't store per-version extension, we assume doc ext. 
+        // If user uploads v2 with diff ext, our code saves as 'original.ext'.
+        // Let's check files in directory to be sure.
+        
+        const getRealExt = async (ver) => {
+            const vp = this.getVersionPath(projectName, docId, ver);
+            const files = await fs.readdir(vp);
+            const orig = files.find(f => f.startsWith('original'));
+            return orig ? path.extname(orig) : '';
+        };
+
+        const ext1 = await getRealExt(v1);
+        const ext2 = await getRealExt(v2);
+
+        if (!force && ext1 !== ext2 && ext1 && ext2) {
+            // Different formats detected! Return Overview instead of heavy diff.
+            return {
+                mode: 'overview',
+                documentName: meta.name,
+                v1: { 
+                    version: v1, 
+                    ext: ext1,
+                    size: text1.length,
+                    lines: text1.split('\n').length,
+                    uploadedAt: metaV1?.uploadedAt 
+                },
+                v2: { 
+                    version: v2, 
+                    ext: ext2,
+                    size: text2.length,
+                    lines: text2.split('\n').length,
+                    uploadedAt: metaV2?.uploadedAt 
+                },
+                message: `Phát hiện khác định dạng file (${ext1} vs ${ext2}). So sánh chi tiết có thể không chính xác.`
+            };
+        }
+
+        // Optimization for weak machines: Truncate large files
+        const MAX_CHARS = 200000;
+        const isTruncated = text1.length > MAX_CHARS || text2.length > MAX_CHARS;
+        
+        if (text1.length > MAX_CHARS) text1 = text1.substring(0, MAX_CHARS) + '\n...[TRUNCATED]...';
+        if (text2.length > MAX_CHARS) text2 = text2.substring(0, MAX_CHARS) + '\n...[TRUNCATED]...';
 
         const Diff = require('diff');
 
-        // Line-by-line diff
+        // Line-by-line diff - First pass (Low Memory Usage)
         const lineDiff = Diff.diffLines(text1, text2);
 
-        // Word-level diff for detailed view
-        const wordDiff = Diff.diffWords(text1, text2);
+        // Process diff to identify modifications (Remove followed by Add)
+        const changes = [];
+        let added = 0, removed = 0, modified = 0, unchanged = 0;
 
-        // Stats
-        let added = 0, removed = 0, unchanged = 0;
-        lineDiff.forEach(part => {
-            const lines = part.count || part.value.split('\n').length - 1;
-            if (part.added) added += lines;
-            else if (part.removed) removed += lines;
-            else unchanged += lines;
-        });
+        for (let i = 0; i < lineDiff.length; i++) {
+            const part = lineDiff[i];
+            
+            // Check for modification pattern: Removed then Added
+            // Optimization: Only group as modification if size is reasonable (< 10 lines)
+            const isSmallChange = part.count < 10;
+            
+            if (part.removed && i + 1 < lineDiff.length && lineDiff[i + 1].added && isSmallChange) {
+                const nextPart = lineDiff[i + 1];
+                
+                // Detailed Word-Level Diff for Modifications (Run only on small chunks to save RAM)
+                const wordDiff = Diff.diffWordsWithSpace(part.value, nextPart.value);
+                
+                changes.push({
+                    type: 'modify',
+                    oldValue: part.value,
+                    newValue: nextPart.value,
+                    details: wordDiff // Send detailed word diff to frontend
+                });
+                modified++;
+                i++; // Skip next part as we handled it
+                continue;
+            } 
+            
+            if (part.added) {
+                changes.push({ type: 'add', value: part.value });
+                added++;
+            } else if (part.removed) {
+                changes.push({ type: 'remove', value: part.value });
+                removed++;
+            } else {
+                // Keep unchanged parts for context, split if too long to avoid huge DOM nodes
+                const lines = part.value.split('\n');
+                // Remove empty last element from split if exists
+                if (lines.length > 0 && lines[lines.length-1] === '') lines.pop();
+                
+                lines.forEach(line => {
+                    changes.push({ type: 'unchanged', value: line });
+                });
+                unchanged += lines.length;
+            }
+        }
 
         return {
+            mode: 'detail',
             documentName: meta.name,
             v1: { version: v1, uploadedAt: meta.versions[v1 - 1]?.uploadedAt },
             v2: { version: v2, uploadedAt: meta.versions[v2 - 1]?.uploadedAt },
-            stats: { added, removed, unchanged, total: added + removed + unchanged },
-            lineDiff,
-            wordDiff: wordDiff.map(p => ({
-                value: p.value,
-                added: !!p.added,
-                removed: !!p.removed
-            }))
+            stats: { added, removed, modified, unchanged, total: added + removed + modified + unchanged },
+            changes, // New structured changes with detailed word diff
+            isTruncated // Flag to warn user
         };
     }
 
@@ -268,7 +388,10 @@ class DocumentService {
             return new Promise((resolve, reject) => {
                 const pdfParser = new PDFParser();
                 pdfParser.on('pdfParser_dataReady', (pdfData) => {
-                    resolve(pdfParser.getRawTextContent());
+                    let text = pdfParser.getRawTextContent();
+                    // pdf2json URI-encodes text, decode it for proper Vietnamese display
+                    try { text = decodeURIComponent(text); } catch (_) { /* already decoded */ }
+                    resolve(text);
                 });
                 pdfParser.on('pdfParser_dataError', (err) => {
                     reject(new Error(err.parserError || 'PDF parse error'));
@@ -278,7 +401,10 @@ class DocumentService {
         }
 
         if (fileType === 'text' || fileType === 'csv') {
-            return await fs.readFile(filePath, 'utf8');
+            let content = await fs.readFile(filePath, 'utf8');
+            // Strip UTF-8 BOM if present
+            if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+            return content;
         }
 
         return '';

@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/dashboard-features.css">
   <link rel="stylesheet" href="css/performance-metrics.css">
   <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/document-style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     /* Critical inline styles for instant first paint */
@@ -21,6 +22,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1a1a1a">
   <link rel="stylesheet" href="/css/adaptive-quality.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
 </head>
 
 <body>
@@ -108,48 +110,86 @@
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
             </svg>
           </button>
-          <button id="shortcutsHelpBtn" class="header-action-btn" title="Phím tắt (Ctrl+/)" aria-label="Keyboard shortcuts">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>
-            </svg>
-          </button>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
     <main class="main-content" role="main">
-      <!-- Toggle button for left panel (outside panel so it stays visible when collapsed) -->
-      <button id="toggleLeftPanelBtn" class="panel-toggle-btn panel-toggle-left" title="Đóng/Mở sidebar"
-        aria-label="Toggle sidebar">
-        ◀
-      </button>
 
-      <!-- Left Panel - Main Data Tree -->
-      <aside class="panel panel-left" id="leftPanel" role="navigation" aria-label="Main Data Tree">
-        <div class="panel-header">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <h2>📁 Main Data</h2>
-          </div>
-          <button id="testAllMainBtn" class="btn btn-secondary btn-sm" title="Re-test all URLs"
-            aria-label="Test lại tất cả URL">
-            🔄 Test All
+      <!-- Left Panel - Main Data Tree & Sections (Tabbed) -->
+      <aside class="panel panel-left" id="leftPanel" role="navigation" aria-label="Main Data & Sections">
+        <!-- Tab bar with collapse toggle -->
+        <div class="sidebar-tabs" role="tablist">
+          <button class="sidebar-tab active" data-sidebar-tab="mainData" role="tab" aria-selected="true">Main Data</button>
+          <button class="sidebar-tab" data-sidebar-tab="sections" role="tab" aria-selected="false">Sections</button>
+          <button id="toggleLeftPanelBtn" class="sidebar-collapse-btn" title="Collapse panel" aria-label="Toggle sidebar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/>
+            </svg>
           </button>
         </div>
-        <div class="panel-content auto-hide-scroll">
-          <div id="mainTree" class="tree-view" role="tree">
-            <div class="empty-state">
-              <div class="empty-icon">
-                <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
-                  <path d="M6 12a2 2 0 012-2h10l4 4h14a2 2 0 012 2v20a2 2 0 01-2 2H8a2 2 0 01-2-2V12z"/>
-                  <path d="M18 26l4 4 8-8" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+
+        <!-- Main Data Tab Content -->
+        <div id="sidebarMainData" class="sidebar-tab-content active">
+          <div class="panel-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2>Main Data</h2>
+            </div>
+            <button id="testAllMainBtn" class="btn btn-secondary btn-sm" title="Re-test all URLs"
+              aria-label="Test lai tat ca URL">
+              Test All
+            </button>
+          </div>
+          <div class="panel-content auto-hide-scroll">
+            <div id="mainTree" class="tree-view" role="tree">
+              <div class="empty-state">
+                <div class="empty-icon">
+                  <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                    <path d="M6 12a2 2 0 012-2h10l4 4h14a2 2 0 012 2v20a2 2 0 01-2 2H8a2 2 0 01-2-2V12z"/>
+                    <path d="M18 26l4 4 8-8" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <p>Chon project de xem du lieu</p>
               </div>
-              <p>Chon project de xem du lieu</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sections Tab Content -->
+        <div id="sidebarSections" class="sidebar-tab-content" style="display: none;">
+          <div class="panel-header">
+            <h2>Sections</h2>
+            <div style="display: flex; gap: 6px;">
+              <button id="authConfigBtn" class="btn btn-secondary btn-sm" title="Cau hinh Login cho Replay"
+                onclick="openCredentialsModal()" aria-label="Cau hinh dang nhap">
+                Auth
+              </button>
+              <button id="newSectionBtn" class="btn btn-primary btn-sm" aria-label="Tao section moi">
+                <span>+</span> New Section
+              </button>
+            </div>
+          </div>
+          <div class="panel-content auto-hide-scroll">
+            <div id="sectionsList" class="sections-list">
+              <div class="empty-state">
+                <div class="empty-icon">
+                  <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <p>Chua co section nao</p>
+              </div>
             </div>
           </div>
         </div>
       </aside>
+      <!-- Expand button (visible only when panel collapsed) -->
+      <button id="expandLeftPanelBtn" class="sidebar-expand-btn" title="Expand panel" aria-label="Expand sidebar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+        </svg>
+      </button>
       <div class="resizer" id="resizerLeft" role="separator" aria-label="Resize left panel"></div>
 
       <!-- Center Panel - Workspace -->
@@ -329,84 +369,8 @@
             </div>
           </div>
 
-          <!-- Documents Tab Content -->
-          <div id="documentsTab" class="tab-content" role="tabpanel" style="display: none;">
-            <div class="doc-toolbar">
-              <div class="doc-toolbar-left">
-                <label class="btn btn-primary btn-sm doc-upload-btn">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="vertical-align:-2px">
-                    <path d="M8 1v10M4 5l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                      stroke-linejoin="round" />
-                    <path d="M2 12v2h12v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                      stroke-linejoin="round" />
-                  </svg>
-                  Upload
-                  <input type="file" id="docFileInput" accept=".docx,.xlsx,.xls,.pdf,.txt,.csv" multiple
-                    style="display:none" onchange="handleDocUpload(this)">
-                </label>
-                <span class="doc-count" id="docCount"></span>
-              </div>
-              <div class="doc-toolbar-right">
-                <input type="text" id="docSearchInput" class="doc-search" placeholder="Tìm tài liệu..."
-                  aria-label="Tìm kiếm tài liệu">
-              </div>
-            </div>
-
-            <!-- Drop zone -->
-            <div id="docDropZone" class="doc-drop-zone">
-              <div class="doc-drop-content">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="opacity:0.3">
-                  <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" />
-                  <path d="M16 18h16M16 24h16M16 30h10" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" />
-                  <path d="M24 38v8M20 42l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                </svg>
-                <p>Kéo thả file vào đây hoặc nhấn Upload</p>
-                <span class="doc-drop-hint">Hỗ trợ: DOCX, XLSX, PDF, TXT, CSV (tối đa 50MB)</span>
-              </div>
-            </div>
-
-            <!-- Document list -->
-            <div id="docList" class="doc-list"></div>
-
-            <!-- Document detail/preview panel -->
-            <div id="docDetail" class="doc-detail" style="display:none">
-              <div class="doc-detail-header">
-                <button class="btn btn-ghost btn-sm" onclick="closeDocDetail()" aria-label="Quay lại">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M10 2L4 8l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                      stroke-linejoin="round" />
-                  </svg>
-                  Quay lại
-                </button>
-                <h3 id="docDetailName"></h3>
-                <div class="doc-detail-actions">
-                  <button class="btn btn-danger btn-xs" onclick="deleteCurrentDoc()" aria-label="Xóa tài liệu">Xóa</button>
-                </div>
-              </div>
-
-              <!-- Version list -->
-              <div class="doc-versions" id="docVersions"></div>
-
-              <!-- Preview area -->
-              <div class="doc-preview-area" id="docPreviewArea">
-                <div class="empty-state">
-                  <p>Chọn version để xem preview</p>
-                </div>
-              </div>
-
-              <!-- Compare area -->
-              <div class="doc-compare-area" id="docCompareArea" style="display:none">
-                <div class="doc-compare-header">
-                  <h4>So sánh version</h4>
-                  <button class="btn btn-ghost btn-xs" onclick="closeDocCompare()" aria-label="Đóng so sánh">Đóng</button>
-                </div>
-                <div class="doc-compare-stats" id="docCompareStats"></div>
-                <div class="doc-compare-diff" id="docCompareDiff"></div>
-              </div>
-            </div>
-          </div>
+          <!-- Documents Tab Content (managed by document-compare.js) -->
+          <div id="documentsTab" class="tab-content" role="tabpanel" style="display: none;"></div>
 
           <!-- API Tab Content -->
           <div id="apiTab" class="tab-content" role="tabpanel" style="display: none;">
@@ -428,11 +392,10 @@
         </div>
       </section>
 
-      <!-- Right Panel - Capture Tools & Sections -->
-      <div class="resizer" id="resizerRight" role="separator" aria-label="Resize right panel"></div>
-      <aside class="panel panel-right" id="rightPanel" role="complementary" aria-label="Sections & Capture Tools">
-        <!-- Capture Tools (shown during capture) -->
-        <div id="captureToolsPanel" class="capture-tools-panel" style="display: none;">
+      <!-- Right Panel - Capture Tools (hidden by default, shown during capture) -->
+      <div class="resizer" id="resizerRight" role="separator" aria-label="Resize right panel" style="display: none;"></div>
+      <aside class="panel panel-right" id="rightPanel" role="complementary" aria-label="Capture Tools" style="display: none;">
+        <div id="captureToolsPanel" class="capture-tools-panel">
           <div class="panel-header">
             <h2>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="vertical-align: -2px;">
@@ -442,8 +405,8 @@
               </svg>
               Capture Tools
             </h2>
-            <button id="stopCaptureToolBtn" class="btn btn-danger btn-sm" aria-label="Dừng capture">
-              &#9632; Dừng
+            <button id="stopCaptureToolBtn" class="btn btn-danger btn-sm" aria-label="Stop capture">
+              &#9632; Stop
             </button>
           </div>
           <div class="panel-content">
@@ -475,45 +438,20 @@
 
             <div class="capture-hint">
               <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-                <strong>Hướng dẫn:</strong><br>
-                &#8226; Nhấn <kbd>ESC</kbd> để chụp màn hình<br>
-                &#8226; Thao tác bình thường trên trang web<br>
-                &#8226; Nhấn "Dừng" khi hoàn tất
+                <strong>Guide:</strong><br>
+                &#8226; Press <kbd>ESC</kbd> to capture screen<br>
+                &#8226; Navigate the page normally<br>
+                &#8226; Press "Stop" when done
               </div>
               <button id="manualCaptureBtn" class="btn btn-primary" style="width: 100%; margin-top: 8px;"
-                aria-label="Chụp màn hình thủ công">
-                📸 Chụp màn hình thủ công
+                aria-label="Manual capture">
+                Capture Screenshot
               </button>
             </div>
 
             <div id="capturedScreensList" class="captured-screens-list">
               <div class="list-header">Captured:</div>
               <div id="capturedScreensItems" class="screens-items">
-                <!-- Screens will be added here dynamically -->
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sections List (shown when not capturing) -->
-        <div id="sectionsPanel" class="sections-panel">
-          <div class="panel-header">
-            <h2>📦 Sections</h2>
-            <div style="display: flex; gap: 6px;">
-              <button id="authConfigBtn" class="btn btn-secondary btn-sm" title="Cấu hình Login cho Replay"
-                onclick="openCredentialsModal()" aria-label="Cấu hình đăng nhập">
-                🔐
-              </button>
-              <button id="newSectionBtn" class="btn btn-primary btn-sm" aria-label="Tạo section mới">
-                <span>+</span> New Section
-              </button>
-            </div>
-          </div>
-          <div class="panel-content auto-hide-scroll">
-            <div id="sectionsList" class="sections-list">
-              <div class="empty-state">
-                <div class="empty-icon">📦</div>
-                <p>Chưa có section nào</p>
               </div>
             </div>
           </div>
@@ -926,6 +864,15 @@
   <script src="js/comment-ui.js"></script>
   <script src="js/theme-manager.js"></script>
   <script src="js/theme-customization.js"></script>
+
+  <!-- PDF.js for Document Preview -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Set worker source
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
 </body>
 
 </html>

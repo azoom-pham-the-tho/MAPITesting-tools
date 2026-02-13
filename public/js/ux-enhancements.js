@@ -904,7 +904,7 @@
     setupLazyImages();
     observeNewImages();
     setupPanelResizers();
-    createShortcutHintButton();
+
     initRippleEffect();
 
     // Expose globally

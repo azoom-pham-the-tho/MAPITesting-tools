@@ -1957,6 +1957,7 @@ document.addEventListener("DOMContentLoaded", () => {
   init();
   setupResizers();
   setupPanelToggles();
+  setupSidebarTabs();
   setupCaptureUI();
 });
 
@@ -1966,41 +1967,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function setupPanelToggles() {
   const leftPanel = document.getElementById('leftPanel');
-  const toggleLeftBtn = document.getElementById('toggleLeftPanelBtn');
+  const collapseBtn = document.getElementById('toggleLeftPanelBtn');
+  const expandBtn = document.getElementById('expandLeftPanelBtn');
 
-  if (toggleLeftBtn && leftPanel) {
-    // Sync toggle button position with panel width
-    const syncTogglePosition = () => {
-      const isCollapsed = leftPanel.classList.contains('collapsed');
-      if (isCollapsed) {
-        toggleLeftBtn.style.left = '0px';
-        toggleLeftBtn.textContent = '▶';
-        toggleLeftBtn.title = 'Mở sidebar';
-      } else {
-        const panelWidth = leftPanel.getBoundingClientRect().width;
-        toggleLeftBtn.style.left = panelWidth + 'px';
-        toggleLeftBtn.textContent = '◀';
-        toggleLeftBtn.title = 'Đóng sidebar';
-      }
-    };
-
-    toggleLeftBtn.addEventListener('click', () => {
-      leftPanel.classList.toggle('collapsed');
-      syncTogglePosition();
+  if (collapseBtn && leftPanel) {
+    collapseBtn.addEventListener('click', () => {
+      leftPanel.classList.add('collapsed');
     });
-
-    // Initial sync
-    syncTogglePosition();
-
-    // Re-sync after panel resize
-    const resizeObserver = new ResizeObserver(() => {
-      if (!leftPanel.classList.contains('collapsed')) {
-        const panelWidth = leftPanel.getBoundingClientRect().width;
-        toggleLeftBtn.style.left = panelWidth + 'px';
-      }
-    });
-    resizeObserver.observe(leftPanel);
   }
+
+  if (expandBtn && leftPanel) {
+    expandBtn.addEventListener('click', () => {
+      leftPanel.classList.remove('collapsed');
+    });
+  }
+}
+
+function setupSidebarTabs() {
+  const tabs = document.querySelectorAll('.sidebar-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetId = tab.getAttribute('data-sidebar-tab');
+      // Update tab active state
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      // Update content visibility
+      document.querySelectorAll('.sidebar-tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+      });
+      const target = document.getElementById(targetId === 'mainData' ? 'sidebarMainData' : 'sidebarSections');
+      if (target) {
+        target.classList.add('active');
+        target.style.display = 'flex';
+      }
+    });
+  });
 }
 
 function setupCaptureUI() {
@@ -2043,28 +2049,30 @@ async function triggerManualCapture() {
 
 // Switch to Capture Tools view
 function showCaptureTools() {
-  const capturePanel = document.getElementById('captureToolsPanel');
-  const sectionsPanel = document.getElementById('sectionsPanel');
   const rightPanel = document.getElementById('rightPanel');
+  const resizerRight = document.getElementById('resizerRight');
 
-  if (capturePanel) capturePanel.style.display = 'flex';
-  if (sectionsPanel) sectionsPanel.style.display = 'none';
-  if (rightPanel) rightPanel.classList.add('capture-active');
+  if (rightPanel) {
+    rightPanel.style.display = 'flex';
+    rightPanel.classList.add('capture-active');
+  }
+  if (resizerRight) resizerRight.style.display = '';
 
   // Reset capture stats
   updateCaptureStats(0, 0, 0);
   clearCapturedScreensList();
 }
 
-// Switch back to Sections view
+// Hide Capture Tools (switch back to normal view)
 function showSectionsPanel() {
-  const capturePanel = document.getElementById('captureToolsPanel');
-  const sectionsPanel = document.getElementById('sectionsPanel');
   const rightPanel = document.getElementById('rightPanel');
+  const resizerRight = document.getElementById('resizerRight');
 
-  if (capturePanel) capturePanel.style.display = 'none';
-  if (sectionsPanel) sectionsPanel.style.display = 'flex';
-  if (rightPanel) rightPanel.classList.remove('capture-active');
+  if (rightPanel) {
+    rightPanel.style.display = 'none';
+    rightPanel.classList.remove('capture-active');
+  }
+  if (resizerRight) resizerRight.style.display = 'none';
 }
 
 // Update capture statistics

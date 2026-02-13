@@ -6,13 +6,33 @@ const path = require('path');
 const fs = require('fs-extra');
 const documentService = require('../services/document.service');
 
+// Helper: decode Multer's latin1 originalname to utf8
+function decodeFileName(rawName) {
+    try {
+        // Multer stores originalname as latin1 bytes, convert back to utf8
+        const decoded = Buffer.from(rawName, 'latin1').toString('utf8');
+        // Verify it's valid UTF-8 by checking for replacement character
+        if (!decoded.includes('\ufffd')) return decoded;
+    } catch { /* fall through */ }
+
+    // Try decoding as URI-encoded string (some browsers encode this way)
+    try {
+        const uriDecoded = decodeURIComponent(rawName);
+        if (uriDecoded !== rawName) return uriDecoded;
+    } catch { /* fall through */ }
+
+    return rawName;
+}
+
 // Multer config: store in temp dir
 const upload = multer({
     dest: path.join(os.tmpdir(), 'mapit-doc-uploads'),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
     fileFilter: (req, file, cb) => {
         const allowed = ['.docx', '.doc', '.xlsx', '.xls', '.pdf', '.txt', '.csv'];
-        const ext = path.extname(file.originalname).toLowerCase();
+        // Decode filename first to handle Vietnamese chars in extension path
+        const decoded = decodeFileName(file.originalname);
+        const ext = path.extname(decoded).toLowerCase();
         if (allowed.includes(ext)) {
             cb(null, true);
         } else {
@@ -27,10 +47,14 @@ router.post('/:project/upload', upload.single('file'), async (req, res, next) =>
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
+
+        // Fix Vietnamese filename encoding (Multer default is latin1)
+        const originalname = decodeFileName(req.file.originalname);
+
         const result = await documentService.upload(
             req.params.project,
             req.file.path,
-            req.file.originalname
+            originalname
         );
         // Clean up temp file
         await fs.remove(req.file.path).catch(() => {});
@@ -61,6 +85,20 @@ router.get('/:project/:docId', async (req, res, next) => {
     }
 });
 
+// Update document category
+router.put('/:project/:docId/category', async (req, res, next) => {
+    try {
+        const { category } = req.body;
+        if (!category) {
+            return res.status(400).json({ error: 'Category required' });
+        }
+        const result = await documentService.updateCategory(req.params.project, req.params.docId, category);
+        res.json({ success: true, document: result });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Download version
 router.get('/:project/:docId/:version/download', async (req, res, next) => {
     try {
@@ -68,7 +106,12 @@ router.get('/:project/:docId/:version/download', async (req, res, next) => {
         const { filePath, fileName } = await documentService.getFilePath(
             req.params.project, req.params.docId, version
         );
-        res.download(filePath, fileName);
+        // Encode Vietnamese filename for Content-Disposition header (RFC 5987)
+        const encodedName = encodeURIComponent(fileName).replace(/'/g, '%27');
+        // ASCII fallback: replace non-ASCII chars with underscore
+        const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_');
+        res.setHeader('Content-Disposition', `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedName}`);
+        res.sendFile(path.resolve(filePath));
     } catch (error) {
         next(error);
     }
@@ -87,16 +130,42 @@ router.get('/:project/:docId/:version/preview', async (req, res, next) => {
     }
 });
 
+// Get more Excel rows (lazy load)
+router.get('/:project/:docId/:version/excel-rows', async (req, res, next) => {
+    try {
+        const version = parseInt(req.params.version);
+        const { sheet, offset, limit } = req.query;
+        if (!sheet) return res.status(400).json({ error: 'sheet query param required' });
+
+        const meta = await documentService.getDocument(req.params.project, req.params.docId);
+        const versionPath = documentService.getVersionPath(req.params.project, req.params.docId, version);
+        const filePath = require('path').join(versionPath, `original${meta.ext}`);
+
+        const XLSX = require('xlsx');
+        const workbook = XLSX.readFile(filePath);
+        const allRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheet], { header: 1 });
+
+        const start = parseInt(offset) || 0;
+        const count = parseInt(limit) || 50;
+        const rows = allRows.slice(start, start + count);
+
+        res.json({ success: true, rows, hasMore: start + count < allRows.length, total: allRows.length });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Compare two versions
 router.get('/:project/:docId/compare', async (req, res, next) => {
     try {
-        const { v1, v2 } = req.query;
+        const { v1, v2, force } = req.query;
         if (!v1 || !v2) {
             return res.status(400).json({ error: 'v1 and v2 query params required' });
         }
         const result = await documentService.compareVersions(
             req.params.project, req.params.docId,
-            parseInt(v1), parseInt(v2)
+            parseInt(v1), parseInt(v2),
+            force === 'true' // Convert string to boolean
         );
         res.json({ success: true, ...result });
     } catch (error) {
