@@ -590,75 +590,25 @@ const ReportUI = {
   },
 
   // ========================================
-  // Tab Button
+  // Tab Button (integrated into Testing tab)
   // ========================================
   _addTabButton() {
-    const tablist = document.querySelector('.workspace-tabs');
-    if (!tablist) return;
-
-    // Check if already added
-    if (tablist.querySelector('[data-tab="reports"]')) return;
-
-    const tabBtn = document.createElement('button');
-    tabBtn.className = 'tab-btn';
-    tabBtn.setAttribute('data-tab', 'reports');
-    tabBtn.setAttribute('role', 'tab');
-    tabBtn.setAttribute('aria-selected', 'false');
-    tabBtn.innerHTML = this.icons.report + ' Reports';
-
-    // Insert before the tab-group (compare/api)
-    const tabGroup = tablist.querySelector('.tab-group');
-    if (tabGroup) {
-      tablist.insertBefore(tabBtn, tabGroup);
-    } else {
-      tablist.appendChild(tabBtn);
-    }
-
-    // Click handler - integrate with existing switchTab system
-    tabBtn.addEventListener('click', () => {
-      // Deactivate all tabs
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-selected', 'false');
-      });
-      document.querySelectorAll('.tab-content').forEach(c => {
-        c.classList.remove('active');
-        c.style.display = 'none';
-      });
-
-      // Activate reports tab
-      tabBtn.classList.add('active');
-      tabBtn.setAttribute('aria-selected', 'true');
-      const tabEl = document.getElementById('reportsTab');
-      if (tabEl) {
-        tabEl.classList.add('active');
-        tabEl.style.display = '';
-      }
-
-      if (state) state.activeTab = 'reports';
-
-      // Load reports when switching to tab
-      this.loadReports();
-    });
+    // Testing tab is now static in HTML with sub-tabs.
+    // No need to create a separate tab button.
   },
 
   // ========================================
   // Tab Content Area
   // ========================================
   _createTabContent() {
-    const panelContent = document.querySelector('.panel-center .panel-content');
-    if (!panelContent) return;
+    // Reports content renders into #reportsContent inside the Testing tab (static HTML).
+    const container = document.getElementById('reportsContent');
+    if (!container) return;
 
-    // Check if already exists
-    if (document.getElementById('reportsTab')) return;
+    // Check if already initialized
+    if (document.getElementById('reportTabContainer')) return;
 
-    const tabEl = document.createElement('div');
-    tabEl.id = 'reportsTab';
-    tabEl.className = 'tab-content';
-    tabEl.setAttribute('role', 'tabpanel');
-    tabEl.style.display = 'none';
-    tabEl.innerHTML = '<div class="report-tab-container" id="reportTabContainer"></div>';
-    panelContent.appendChild(tabEl);
+    container.innerHTML = '<div class="report-tab-container" id="reportTabContainer"></div>';
 
     this.renderTab();
   },

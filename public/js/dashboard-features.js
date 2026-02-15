@@ -9,56 +9,25 @@
 const DashboardFeatures = {
 
   // =========================================================================
-  //  THEME TOGGLE
+  //  THEME TOGGLE (delegated to simple-settings.js)
   // =========================================================================
   theme: {
     current: localStorage.getItem('mapit-theme') || 'dark',
 
     init() {
-      // DISABLED: Let theme-manager.js handle all theme logic
-      // this.apply(this.current);
-      // this._attachToExistingButton();
-      console.log('[DashboardFeatures] Theme management delegated to theme-manager.js');
+      // All theme logic handled by AppSettings (simple-settings.js)
     },
 
     toggle() {
-      // DISABLED: Let theme-manager.js handle theme toggle
-      // Use window.themeManager instead
-      if (window.themeManager) {
-        window.themeManager.toggleTheme();
-      } else {
-        console.warn('[DashboardFeatures] ThemeManager not found');
+      if (window.AppSettings) {
+        window.AppSettings.current.theme = window.AppSettings.current.theme === 'dark' ? 'light' : 'dark';
+        window.AppSettings.save();
+        window.AppSettings.applySettings();
       }
     },
 
     apply(theme) {
-      // DISABLED: Let theme-manager.js handle theme application
-      console.log('[DashboardFeatures] Theme apply called but delegated to theme-manager.js');
-    },
-
-    _attachToExistingButton() {
-      // DISABLED: Let theme-manager.js attach to button
-      // This prevents duplicate event listeners
-    },
-
-    _sunIcon() {
-      return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<circle cx="12" cy="12" r="5"/>' +
-        '<line x1="12" y1="1" x2="12" y2="3"/>' +
-        '<line x1="12" y1="21" x2="12" y2="23"/>' +
-        '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>' +
-        '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>' +
-        '<line x1="1" y1="12" x2="3" y2="12"/>' +
-        '<line x1="21" y1="12" x2="23" y2="12"/>' +
-        '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>' +
-        '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>' +
-        '</svg>';
-    },
-
-    _moonIcon() {
-      return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>' +
-        '</svg>';
+      // Handled by AppSettings
     }
   },
 
@@ -149,7 +118,7 @@ const DashboardFeatures = {
       var fragment = document.createDocumentFragment();
 
       var categories = {};
-      this.registered.forEach(function(s) {
+      this.registered.forEach(function (s) {
         if (!categories[s.category]) categories[s.category] = [];
         categories[s.category].push(s);
       });
@@ -174,7 +143,7 @@ const DashboardFeatures = {
       body.style.overflowY = 'auto';
 
       // Build all tables in fragment first
-      Object.keys(categories).forEach(function(cat) {
+      Object.keys(categories).forEach(function (cat) {
         var groupTitle = document.createElement('div');
         groupTitle.className = 'df-shortcut-category';
         groupTitle.textContent = cat;
@@ -185,7 +154,7 @@ const DashboardFeatures = {
 
         // Build rows in batch
         var tbody = document.createElement('tbody');
-        categories[cat].forEach(function(s) {
+        categories[cat].forEach(function (s) {
           var tr = document.createElement('tr');
           var keyParts = [];
           if (s.ctrl) keyParts.push('Ctrl');
@@ -193,9 +162,9 @@ const DashboardFeatures = {
           if (s.shift) keyParts.push('Shift');
           keyParts.push(s.key === ' ' ? 'Space' : s.key.length === 1 ? s.key.toUpperCase() : s.key);
 
-          var kbdHtml = keyParts.map(function(p) { return '<kbd>' + p + '</kbd>'; }).join(' + ');
+          var kbdHtml = keyParts.map(function (p) { return '<kbd>' + p + '</kbd>'; }).join(' + ');
           tr.innerHTML = '<td class="df-shortcut-keys">' + kbdHtml + '</td>' +
-                         '<td class="df-shortcut-desc">' + s.description + '</td>';
+            '<td class="df-shortcut-desc">' + s.description + '</td>';
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
@@ -206,14 +175,14 @@ const DashboardFeatures = {
       overlay.appendChild(modal);
 
       // Event delegation for close button
-      overlay.addEventListener('click', function(e) {
+      overlay.addEventListener('click', function (e) {
         if (e.target === overlay || e.target.classList.contains('df-modal-close')) {
           overlay.remove();
         }
       });
 
       // Use RAF for smooth append
-      requestAnimationFrame(function() {
+      requestAnimationFrame(function () {
         document.body.appendChild(overlay);
       });
     }
@@ -229,8 +198,7 @@ const DashboardFeatures = {
     _panelVisible: false,
 
     init() {
-      this._attachToExistingBellIcon();
-      this._attachToExistingPanelButtons();
+      // Listeners attached in DOMContentLoaded handler below
       // Panel already exists in HTML (#notificationPanel)
     },
 
@@ -256,7 +224,7 @@ const DashboardFeatures = {
     },
 
     markAllRead() {
-      this.items.forEach(function(item) { item.read = true; });
+      this.items.forEach(function (item) { item.read = true; });
       this.unreadCount = 0;
       this._updateBadge();
       this.renderPanel();
@@ -302,7 +270,7 @@ const DashboardFeatures = {
       if (!panel) return;
 
       var body = panel.querySelector('.notification-panel-list') ||
-                 document.getElementById('notificationList');
+        document.getElementById('notificationList');
       if (!body) return;
 
       if (this.items.length === 0) {
@@ -314,7 +282,7 @@ const DashboardFeatures = {
       var fragment = document.createDocumentFragment();
       var self = this;
 
-      this.items.forEach(function(item) {
+      this.items.forEach(function (item) {
         var icon = self._typeIcon(item.type);
         var timeStr = self._timeAgo(item.time);
         var readClass = item.read ? 'notification-read' : 'notification-unread';
@@ -325,9 +293,9 @@ const DashboardFeatures = {
 
         div.innerHTML = '<div class="notification-icon notification-icon-' + item.type + '">' + icon + '</div>' +
           '<div class="notification-content">' +
-            '<div class="notification-title">' + self._escapeHtml(item.title) + '</div>' +
-            '<div class="notification-message">' + self._escapeHtml(item.message) + '</div>' +
-            '<div class="notification-time">' + timeStr + '</div>' +
+          '<div class="notification-title">' + self._escapeHtml(item.title) + '</div>' +
+          '<div class="notification-message">' + self._escapeHtml(item.message) + '</div>' +
+          '<div class="notification-time">' + timeStr + '</div>' +
           '</div>';
 
         fragment.appendChild(div);
@@ -354,7 +322,7 @@ const DashboardFeatures = {
         var panel = document.getElementById('notificationPanel');
         var bellWrapper = document.getElementById('notificationBellWrapper');
         if (panel && bellWrapper && self._panelVisible &&
-            !bellWrapper.contains(e.target)) {
+          !bellWrapper.contains(e.target)) {
           self.hide();
         }
       });
@@ -374,14 +342,14 @@ const DashboardFeatures = {
       panel.className = 'df-notification-panel';
       panel.innerHTML =
         '<div class="df-notif-header">' +
-          '<span class="df-notif-header-title">Notifications</span>' +
-          '<div class="df-notif-header-actions">' +
-            '<button id="df-notif-mark-read" class="df-link-btn" title="Mark all as read">Mark all read</button>' +
-            '<button id="df-notif-clear" class="df-link-btn" title="Clear all">' + DashboardFeatures._icons.trash + '</button>' +
-          '</div>' +
+        '<span class="df-notif-header-title">Thông báo</span>' +
+        '<div class="df-notif-header-actions">' +
+        '<button id="df-notif-mark-read" class="df-link-btn" title="Đánh dấu tất cả đã đọc">Đã đọc hết</button>' +
+        '<button id="df-notif-clear" class="df-link-btn" title="Xóa tất cả thông báo">' + DashboardFeatures._icons.trash + '</button>' +
+        '</div>' +
         '</div>' +
         '<div class="df-notif-body">' +
-          '<div class="df-notif-empty">No notifications</div>' +
+        '<div class="df-notif-empty">Không có thông báo</div>' +
         '</div>';
 
       document.body.appendChild(panel);
@@ -413,14 +381,14 @@ const DashboardFeatures = {
 
     _timeAgo(date) {
       var seconds = Math.floor((new Date() - date) / 1000);
-      if (seconds < 5) return 'just now';
-      if (seconds < 60) return seconds + 's ago';
+      if (seconds < 5) return 'vừa xong';
+      if (seconds < 60) return seconds + ' giây trước';
       var minutes = Math.floor(seconds / 60);
-      if (minutes < 60) return minutes + 'm ago';
+      if (minutes < 60) return minutes + ' phút trước';
       var hours = Math.floor(minutes / 60);
-      if (hours < 24) return hours + 'h ago';
+      if (hours < 24) return hours + ' giờ trước';
       var days = Math.floor(hours / 24);
-      return days + 'd ago';
+      return days + ' ngày trước';
     },
 
     _escapeHtml(str) {
@@ -471,7 +439,7 @@ const DashboardFeatures = {
 
       // Search projects
       if (typeof state !== 'undefined' && state.projects) {
-        state.projects.forEach(function(proj) {
+        state.projects.forEach(function (proj) {
           var name = typeof proj === 'string' ? proj : proj.name;
           if (name && name.toLowerCase().indexOf(q) !== -1) {
             results.push({
@@ -479,7 +447,7 @@ const DashboardFeatures = {
               icon: DashboardFeatures._icons.folder,
               title: name,
               subtitle: 'Project',
-              action: function() {
+              action: function () {
                 if (typeof state !== 'undefined') {
                   state.currentProject = name;
                   if (typeof api !== 'undefined' && api.getSections) {
@@ -494,7 +462,7 @@ const DashboardFeatures = {
 
       // Search sections
       if (typeof state !== 'undefined' && state.sections) {
-        state.sections.forEach(function(section) {
+        state.sections.forEach(function (section) {
           var sectionName = section.name || section.title || section.timestamp || '';
           var sectionUrl = section.url || section.path || '';
           var searchText = (sectionName + ' ' + sectionUrl).toLowerCase();
@@ -504,7 +472,7 @@ const DashboardFeatures = {
               icon: DashboardFeatures._icons.file,
               title: sectionName,
               subtitle: sectionUrl || 'Section',
-              action: function() {
+              action: function () {
                 if (typeof switchTab === 'function') switchTab('preview');
               }
             });
@@ -516,7 +484,7 @@ const DashboardFeatures = {
       if (typeof state !== 'undefined' && state.mainTree) {
         var tree = state.mainTree;
         var flatNodes = this._flattenTree(tree);
-        flatNodes.forEach(function(node) {
+        flatNodes.forEach(function (node) {
           var nodeText = (node.name || node.url || node.path || '').toLowerCase();
           if (nodeText.indexOf(q) !== -1) {
             results.push({
@@ -524,7 +492,7 @@ const DashboardFeatures = {
               icon: DashboardFeatures._icons.monitor,
               title: node.name || node.url || node.path || 'Screen',
               subtitle: node.url || node.path || '',
-              action: function() {
+              action: function () {
                 if (typeof switchTab === 'function') switchTab('sitemap');
               }
             });
@@ -534,14 +502,14 @@ const DashboardFeatures = {
 
       // Search tab names
       var tabs = ['sitemap', 'preview', 'documents', 'compare', 'api', 'dashboard'];
-      tabs.forEach(function(tab) {
+      tabs.forEach(function (tab) {
         if (tab.indexOf(q) !== -1) {
           results.push({
             group: 'Navigation',
             icon: DashboardFeatures._icons.navigate,
             title: tab.charAt(0).toUpperCase() + tab.slice(1),
             subtitle: 'Switch to tab',
-            action: function() {
+            action: function () {
               if (tab === 'dashboard') {
                 DashboardFeatures.analytics.activateTab();
               } else if (typeof switchTab === 'function') {
@@ -560,7 +528,7 @@ const DashboardFeatures = {
       var recent = this.recentSearches;
       var entry = { title: result.title, subtitle: result.subtitle, group: result.group };
       // Remove duplicate
-      recent = recent.filter(function(r) { return r.title !== entry.title || r.group !== entry.group; });
+      recent = recent.filter(function (r) { return r.title !== entry.title || r.group !== entry.group; });
       recent.unshift(entry);
       if (recent.length > 10) recent = recent.slice(0, 10);
       this.recentSearches = recent;
@@ -588,7 +556,7 @@ const DashboardFeatures = {
       var input = document.createElement('input');
       input.type = 'text';
       input.className = 'df-search-input';
-      input.placeholder = 'Search projects, sections, screens...';
+      input.placeholder = 'Tìm kiếm project, section, screen...';
       input.addEventListener('input', (e) => this.handleInput(e.target.value));
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') this.close();
@@ -607,8 +575,8 @@ const DashboardFeatures = {
       var hint = document.createElement('div');
       hint.className = 'df-search-hint';
       hint.innerHTML = '<span><kbd>Enter</kbd> to select</span>' +
-                       '<span><kbd>' + String.fromCharCode(8593) + '</kbd><kbd>' + String.fromCharCode(8595) + '</kbd> to navigate</span>' +
-                       '<span><kbd>Esc</kbd> to close</span>';
+        '<span><kbd>' + String.fromCharCode(8593) + '</kbd><kbd>' + String.fromCharCode(8595) + '</kbd> to navigate</span>' +
+        '<span><kbd>Esc</kbd> to close</span>';
       container.appendChild(hint);
 
       overlay.appendChild(container);
@@ -630,10 +598,10 @@ const DashboardFeatures = {
 
       var title = document.createElement('div');
       title.className = 'df-search-group-title';
-      title.textContent = 'Recent Searches';
+      title.textContent = 'Tìm kiếm gần đây';
       fragment.appendChild(title);
 
-      this.recentSearches.forEach(function(item) {
+      this.recentSearches.forEach(function (item) {
         var div = document.createElement('div');
         div.className = 'df-search-result-item';
         div.tabIndex = 0;
@@ -641,8 +609,8 @@ const DashboardFeatures = {
 
         div.innerHTML = '<span class="df-search-result-icon">' + DashboardFeatures._icons.clock + '</span>' +
           '<span class="df-search-result-text">' +
-            '<span class="df-search-result-title">' + self._escapeHtml(item.title) + '</span>' +
-            '<span class="df-search-result-sub">' + self._escapeHtml(item.subtitle || '') + '</span>' +
+          '<span class="df-search-result-title">' + self._escapeHtml(item.title) + '</span>' +
+          '<span class="df-search-result-sub">' + self._escapeHtml(item.subtitle || '') + '</span>' +
           '</span>';
 
         fragment.appendChild(div);
@@ -659,7 +627,7 @@ const DashboardFeatures = {
       }
 
       var grouped = {};
-      results.forEach(function(r) {
+      results.forEach(function (r) {
         if (!grouped[r.group]) grouped[r.group] = [];
         grouped[r.group].push(r);
       });
@@ -668,13 +636,13 @@ const DashboardFeatures = {
       var self = this;
       var idx = 0;
 
-      Object.keys(grouped).forEach(function(group) {
+      Object.keys(grouped).forEach(function (group) {
         var groupTitle = document.createElement('div');
         groupTitle.className = 'df-search-group-title';
         groupTitle.textContent = group;
         fragment.appendChild(groupTitle);
 
-        grouped[group].forEach(function(r) {
+        grouped[group].forEach(function (r) {
           var div = document.createElement('div');
           div.className = 'df-search-result-item';
           div.tabIndex = 0;
@@ -682,8 +650,8 @@ const DashboardFeatures = {
 
           div.innerHTML = '<span class="df-search-result-icon">' + r.icon + '</span>' +
             '<span class="df-search-result-text">' +
-              '<span class="df-search-result-title">' + self._escapeHtml(r.title) + '</span>' +
-              '<span class="df-search-result-sub">' + self._escapeHtml(r.subtitle) + '</span>' +
+            '<span class="df-search-result-title">' + self._escapeHtml(r.title) + '</span>' +
+            '<span class="df-search-result-sub">' + self._escapeHtml(r.subtitle) + '</span>' +
             '</span>';
 
           fragment.appendChild(div);
@@ -777,7 +745,7 @@ const DashboardFeatures = {
     selectAll() {
       var cards = document.querySelectorAll('.section-card, .section-item, [data-section-id]');
       var self = this;
-      cards.forEach(function(card) {
+      cards.forEach(function (card) {
         var id = card.getAttribute('data-section-id') || card.getAttribute('data-timestamp');
         if (id) {
           self.selectedSections.add(id);
@@ -790,7 +758,7 @@ const DashboardFeatures = {
 
     deselectAll() {
       var self = this;
-      this.selectedSections.forEach(function(id) {
+      this.selectedSections.forEach(function (id) {
         self._updateCheckbox(id, false);
       });
       this.selectedSections.clear();
@@ -804,16 +772,16 @@ const DashboardFeatures = {
 
       var promises = [];
       var self = this;
-      this.selectedSections.forEach(function(id) {
+      this.selectedSections.forEach(function (id) {
         if (typeof api !== 'undefined' && api.deleteSection) {
           promises.push(
             api.deleteSection(state.currentProject, id)
-              .catch(function(err) { console.error('Delete failed for', id, err); })
+              .catch(function (err) { console.error('Delete failed for', id, err); })
           );
         }
       });
 
-      Promise.all(promises).then(function() {
+      Promise.all(promises).then(function () {
         self.selectedSections.clear();
         self.renderToolbar();
         if (typeof showToast === 'function') {
@@ -851,7 +819,7 @@ const DashboardFeatures = {
               api.getSections(state.currentProject);
             }
           })
-          .catch(function(err) {
+          .catch(function (err) {
             if (typeof showToast === 'function') {
               showToast('Merge failed: ' + err.message, 'error');
             }
@@ -899,9 +867,9 @@ const DashboardFeatures = {
     _observeSections() {
       // Watch for section cards being added to the DOM
       var self = this;
-      var observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-          mutation.addedNodes.forEach(function(node) {
+      var observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          mutation.addedNodes.forEach(function (node) {
             if (node.nodeType === 1) {
               self._injectCheckboxes(node);
             }
@@ -911,13 +879,13 @@ const DashboardFeatures = {
       observer.observe(document.body, { childList: true, subtree: true });
 
       // Also inject into existing cards
-      setTimeout(function() { self._injectCheckboxes(document.body); }, 500);
+      setTimeout(function () { self._injectCheckboxes(document.body); }, 500);
     },
 
     _injectCheckboxes(root) {
       var cards = root.querySelectorAll ? root.querySelectorAll('.section-card, .section-item, [data-section-id]') : [];
       var self = this;
-      cards.forEach(function(card) {
+      cards.forEach(function (card) {
         if (card.querySelector('.df-bulk-checkbox')) return;
         var id = card.getAttribute('data-section-id') || card.getAttribute('data-timestamp');
         if (!id) return;
@@ -925,8 +893,8 @@ const DashboardFeatures = {
         var cb = document.createElement('label');
         cb.className = 'df-bulk-checkbox';
         cb.innerHTML = '<input type="checkbox" data-bulk-id="' + id + '"><span class="df-bulk-checkmark">' + DashboardFeatures._icons.check + '</span>';
-        cb.addEventListener('click', function(e) { e.stopPropagation(); });
-        cb.querySelector('input').addEventListener('change', function() {
+        cb.addEventListener('click', function (e) { e.stopPropagation(); });
+        cb.querySelector('input').addEventListener('change', function () {
           self.toggleSelection(id);
         });
         card.style.position = card.style.position || 'relative';
@@ -968,61 +936,155 @@ const DashboardFeatures = {
       if (!dashboardTab) return;
 
       var self = this;
+
+      // Update hero banner with project name
+      var heroTitle = document.getElementById('dashProjectName');
+      var heroDesc = document.getElementById('dashProjectDesc');
+      if (typeof state !== 'undefined' && state.currentProject) {
+        if (heroTitle) heroTitle.textContent = '📋 ' + state.currentProject;
+        if (heroDesc) {
+          var sectionCount = state.sections ? state.sections.length : 0;
+          heroDesc.textContent = sectionCount + ' phiên bản đã chụp · Đang tải dữ liệu...';
+        }
+      } else {
+        if (heroTitle) heroTitle.textContent = 'Chào mừng đến MAPIT';
+        if (heroDesc) heroDesc.textContent = 'Chọn project ở sidebar bên trái để xem tổng quan';
+      }
+
       var statsPromise = this._gatherStats();
       var testPromise = this._fetchTestResults();
 
-      Promise.all([statsPromise, testPromise]).then(function(results) {
+      Promise.all([statsPromise, testPromise]).then(function (results) {
         var stats = results[0];
         var testResults = results[1];
 
-        // Update stat cards numbers (use existing HTML elements)
+        // Update hero subtitle with real data
+        if (heroDesc && typeof state !== 'undefined' && state.currentProject) {
+          var sCount = state.sections ? state.sections.length : 0;
+          var parts = [];
+          parts.push(stats.totalScreens + ' màn hình');
+          parts.push(stats.totalAPIs + ' API');
+          parts.push(sCount + ' phiên bản');
+          heroDesc.textContent = parts.join(' · ');
+        }
+
+        // Update stat cards numbers
         var dashTotalScreens = document.getElementById('dashTotalScreens');
         var dashTotalAPIs = document.getElementById('dashTotalAPIs');
         var dashTotalSections = document.getElementById('dashTotalSections');
         var dashStorageSize = document.getElementById('dashStorageSize');
 
-        if (dashTotalScreens) dashTotalScreens.textContent = stats.totalScreens;
+        if (dashTotalScreens) dashTotalScreens.textContent = stats.screensWithUI + '/' + stats.totalScreens;
         if (dashTotalAPIs) dashTotalAPIs.textContent = stats.totalAPIs;
         if (dashTotalSections) dashTotalSections.textContent = stats.totalSections;
         if (dashStorageSize) dashStorageSize.textContent = stats.storageSize;
 
-        // Add Recent Activity and Test Results sections if not exist
-        var dashboardContainer = document.getElementById('dashboardContainer');
-        if (!dashboardContainer) return;
+        // Update coverage ring
+        self._updateCoverage(stats, testResults);
 
-        // Remove old dynamic sections
-        var oldActivity = dashboardContainer.querySelector('.df-activity-section');
-        var oldTests = dashboardContainer.querySelector('.df-test-section');
-        if (oldActivity) oldActivity.remove();
-        if (oldTests) oldTests.remove();
+        // Update mini flow
+        self._updateFlowMini();
 
-        // Add Recent Activity section
-        var activityHtml = '<div class="dashboard-section df-activity-section">';
-        activityHtml += '<div class="dashboard-section-header"><h3>Recent Activity</h3></div>';
-        activityHtml += self.renderRecentActivity(stats.recentSections);
-        activityHtml += '</div>';
+        // Update existing HTML sections  
+        var activityTimeline = document.getElementById('activityTimeline');
+        if (activityTimeline) {
+          activityTimeline.innerHTML = self.renderRecentActivity(stats.recentSections);
+        }
 
-        // Add Test Results section
-        var testHtml = '<div class="dashboard-section df-test-section">';
-        testHtml += '<div class="dashboard-section-header">';
-        testHtml += '<h3>Test Results</h3>';
-        testHtml += '<button class="btn btn-ghost btn-xs" id="dashRunTestsBtn">Run All Tests</button>';
-        testHtml += '</div>';
-        testHtml += self.renderTestResults(testResults);
-        testHtml += '</div>';
-
-        // Append new sections after stats
-        var statsSection = dashboardContainer.querySelector('.dashboard-stats');
-        if (statsSection) {
-          statsSection.insertAdjacentHTML('afterend', activityHtml + testHtml);
-        } else {
-          dashboardContainer.insertAdjacentHTML('beforeend', activityHtml + testHtml);
+        var testResultsSummary = document.getElementById('testResultsSummary');
+        if (testResultsSummary) {
+          testResultsSummary.innerHTML = self.renderTestResults(testResults);
         }
 
         self._attachQuickActionHandlers();
-      }).catch(function(err) {
+
+        // Attach view sitemap button
+        var viewSitemapBtn = document.getElementById('dashViewSitemapBtn');
+        if (viewSitemapBtn && !viewSitemapBtn.dataset.attached) {
+          viewSitemapBtn.addEventListener('click', function () {
+            if (typeof switchTab === 'function') switchTab('sitemap');
+          });
+          viewSitemapBtn.dataset.attached = 'true';
+        }
+      }).catch(function (err) {
         console.error('Failed to load dashboard:', err);
       });
+    },
+
+    _updateCoverage(stats, testResults) {
+      var total = stats.totalScreens || 0;
+      var withUI = stats.screensWithUI || 0;
+      var withAPI = stats.screensWithAPI || 0;
+      var tested = testResults ? testResults.length : 0;
+
+      // Coverage % = screens with captured UI / total screens in flow
+      var coverage = total > 0 ? Math.round((withUI / total) * 100) : 0;
+
+      // Update ring
+      var arc = document.getElementById('dashCoverageArc');
+      var percentEl = document.getElementById('dashCoveragePercent');
+
+      if (arc) {
+        var circumference = 314; // 2 * PI * 50
+        var offset = circumference - (circumference * coverage / 100);
+        arc.style.strokeDashoffset = offset;
+      }
+      if (percentEl) percentEl.textContent = coverage + '%';
+
+      // Update details
+      var covUI = document.getElementById('dashCovUI');
+      var covAPI = document.getElementById('dashCovAPI');
+      var covTest = document.getElementById('dashCovTest');
+      if (covUI) covUI.textContent = withUI + ' / ' + total;
+      if (covAPI) covAPI.textContent = withAPI + ' / ' + total;
+      if (covTest) covTest.textContent = tested;
+    },
+
+    _updateFlowMini() {
+      var container = document.getElementById('dashFlowMini');
+      if (!container) return;
+
+      // Get flow data from mainTree if available
+      if (typeof state === 'undefined' || !state.mainTree || state.mainTree.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:24px;"><p>Chọn project để xem cấu trúc màn hình</p></div>';
+        return;
+      }
+
+      var screens = [];
+      var extractScreens = function (nodes) {
+        nodes.forEach(function (n) {
+          if (n.name !== 'UI' && n.name !== 'APIs' && n.type !== 'api') {
+            var hasUI = n.children && n.children.some(function (c) { return c.name === 'UI'; });
+            if (hasUI || n.type === 'ui') {
+              screens.push({
+                name: n.name.replace(/_/g, ' '),
+                path: n.path || n.name,
+                type: n.name.startsWith('tab_') ? 'tab' : n.name.startsWith('modal_') ? 'modal' : 'page'
+              });
+            }
+          }
+          if (n.children) extractScreens(n.children);
+        });
+      };
+      extractScreens(state.mainTree);
+
+      if (screens.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:24px;"><p>Chưa có màn hình nào</p></div>';
+        return;
+      }
+
+      var html = '<div class="dash-flow-nodes">';
+      screens.slice(0, 15).forEach(function (s, i) {
+        var icon = s.type === 'tab' ? '🏷️' : s.type === 'modal' ? '🗔' : '📄';
+        if (i > 0) html += '<span class="dash-flow-arrow">→</span>';
+        html += '<div class="dash-flow-node" title="' + DashboardFeatures._escapeHtml(s.path) + '"><span class="flow-icon">' + icon + '</span>' + DashboardFeatures._escapeHtml(s.name) + '</div>';
+      });
+      if (screens.length > 15) {
+        html += '<span class="dash-flow-arrow">...</span>';
+        html += '<div class="dash-flow-node" style="opacity:0.6">+' + (screens.length - 15) + ' khác</div>';
+      }
+      html += '</div>';
+      container.innerHTML = html;
     },
 
     renderStatsCards(data) {
@@ -1034,14 +1096,14 @@ const DashboardFeatures = {
       ];
 
       var html = '<div class="df-stats-row">';
-      cards.forEach(function(card) {
+      cards.forEach(function (card) {
         html += '<div class="df-stat-card">' +
           '<div class="df-stat-icon" style="color:' + card.color + '">' + card.icon + '</div>' +
           '<div class="df-stat-info">' +
-            '<div class="df-stat-value">' + card.value + '</div>' +
-            '<div class="df-stat-label">' + card.label + '</div>' +
+          '<div class="df-stat-value">' + card.value + '</div>' +
+          '<div class="df-stat-label">' + card.label + '</div>' +
           '</div>' +
-        '</div>';
+          '</div>';
       });
       html += '</div>';
       return html;
@@ -1051,21 +1113,54 @@ const DashboardFeatures = {
       var html = '';
 
       if (!sections || sections.length === 0) {
-        html += '<div class="df-dashboard-empty">No recent activity</div>';
+        html += '<div class="df-dashboard-empty">Chưa có hoạt động gần đây</div>';
       } else {
         html += '<div class="df-activity-list">';
-        sections.slice(0, 10).forEach(function(section) {
-          var name = section.name || section.title || 'Untitled';
-          var time = section.timestamp ? new Date(section.timestamp).toLocaleString() : 'Unknown';
-          var url = section.url || section.path || '';
+        sections.slice(0, 10).forEach(function (section) {
+          // Extract name: use section name/title, or extract from path
+          var name = section.name || section.title || '';
+          if (!name || name === 'Untitled') {
+            // Try to get from path - last segment
+            var p = section.path || section.url || '';
+            var segments = p.replace(/\\/g, '/').split('/').filter(Boolean);
+            name = segments.length > 0 ? segments[segments.length - 1] : 'Untitled';
+          }
+
+          // Parse timestamp from folder name format: "2026-02-09T07-17-54-280Z"
+          var time = '';
+          var rawTs = section.timestamp || section.name || '';
+          // Try direct Date parse first
+          var date = new Date(rawTs);
+          if (isNaN(date.getTime())) {
+            // Try to parse from section folder name format
+            var tsMatch = String(rawTs).match(/(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+            if (tsMatch) {
+              date = new Date(tsMatch[1] + 'T' + tsMatch[2] + ':' + tsMatch[3] + ':' + tsMatch[4] + 'Z');
+            }
+          }
+          if (!isNaN(date.getTime())) {
+            time = date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          }
+
+          // Clean the display name - remove timestamps from name
+          var displayName = name.replace(/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}.*/, '').trim();
+          // If name was entirely a timestamp, show friendly label
+          if (!displayName) {
+            displayName = time ? 'Section lúc ' + time : 'Section #' + (sections.indexOf(section) + 1);
+          }
+          // Humanize underscores
+          displayName = displayName.replace(/_/g, ' ');
+
+          var screenCount = section.screenCount || (section.screens ? section.screens.length : 0);
+
           html += '<div class="df-activity-item">' +
             '<div class="df-activity-icon">' + DashboardFeatures._icons.clock + '</div>' +
             '<div class="df-activity-info">' +
-              '<div class="df-activity-name">' + DashboardFeatures._escapeHtml(name) + '</div>' +
-              '<div class="df-activity-meta">' + DashboardFeatures._escapeHtml(url) + '</div>' +
-              '<div class="df-activity-time">' + time + '</div>' +
+            '<div class="df-activity-name">' + DashboardFeatures._escapeHtml(displayName) + '</div>' +
+            (screenCount > 0 ? '<div class="df-activity-meta">' + screenCount + ' màn hình</div>' : '') +
+            (time ? '<div class="df-activity-time">' + time + '</div>' : '') +
             '</div>' +
-          '</div>';
+            '</div>';
         });
         html += '</div>';
       }
@@ -1075,7 +1170,7 @@ const DashboardFeatures = {
 
     renderQuickActions() {
       var html = '<div class="df-dashboard-section">';
-      html += '<div class="df-dashboard-section-title">Quick Actions</div>';
+      html += '<div class="df-dashboard-section-title">Thao Tác Nhanh</div>';
       html += '<div class="df-quick-actions">';
       html += '<button class="df-quick-btn" id="df-qa-capture">' + DashboardFeatures._icons.capture + ' New Capture</button>';
       html += '<button class="df-quick-btn" id="df-qa-compare">' + DashboardFeatures._icons.compare + ' Compare</button>';
@@ -1089,20 +1184,20 @@ const DashboardFeatures = {
       var html = '';
 
       if (!results || results.length === 0) {
-        html += '<div class="df-dashboard-empty">No test results available</div>';
+        html += '<div class="df-dashboard-empty">Chưa có kết quả test</div>';
       } else {
         html += '<div class="df-test-list">';
-        results.slice(0, 5).forEach(function(r) {
+        results.slice(0, 5).forEach(function (r) {
           var statusIcon = r.status === 'passed' ? DashboardFeatures._icons.checkCircle :
-                           r.status === 'failed' ? DashboardFeatures._icons.alertCircle :
-                           DashboardFeatures._icons.clock;
+            r.status === 'failed' ? DashboardFeatures._icons.alertCircle :
+              DashboardFeatures._icons.clock;
           var statusClass = 'df-test-' + (r.status || 'unknown');
           var time = r.timestamp ? new Date(r.timestamp).toLocaleString() : '';
           html += '<div class="df-test-item ' + statusClass + '">' +
             '<span class="df-test-status">' + statusIcon + '</span>' +
             '<span class="df-test-name">' + DashboardFeatures._escapeHtml(r.name || 'Test') + '</span>' +
             '<span class="df-test-time">' + time + '</span>' +
-          '</div>';
+            '</div>';
         });
         html += '</div>';
       }
@@ -1126,8 +1221,8 @@ const DashboardFeatures = {
 
       // Fallback: create new tab if doesn't exist (shouldn't happen)
       var tabContainer = document.querySelector('.workspace-tabs') ||
-                         document.querySelector('.tabs') ||
-                         document.querySelector('[role="tablist"]');
+        document.querySelector('.tabs') ||
+        document.querySelector('[role="tablist"]');
       if (!tabContainer) return;
 
       var tab = document.createElement('button');
@@ -1146,9 +1241,9 @@ const DashboardFeatures = {
 
       // Create content area
       var contentParent = document.querySelector('.workspace-content') ||
-                          document.querySelector('.tab-panels') ||
-                          document.querySelector('.content-area') ||
-                          document.querySelector('main');
+        document.querySelector('.tab-panels') ||
+        document.querySelector('.content-area') ||
+        document.querySelector('main');
 
       if (contentParent) {
         var content = document.createElement('div');
@@ -1164,9 +1259,11 @@ const DashboardFeatures = {
     },
 
     _gatherStats() {
-      return new Promise(function(resolve) {
+      return new Promise(function (resolve) {
         var stats = {
           totalScreens: 0,
+          screensWithUI: 0,
+          screensWithAPI: 0,
           totalAPIs: 0,
           totalSections: 0,
           storageSize: '--',
@@ -1175,51 +1272,80 @@ const DashboardFeatures = {
 
         if (typeof state !== 'undefined' && state.sections) {
           stats.totalSections = state.sections.length;
-          stats.recentSections = state.sections.slice().sort(function(a, b) {
+          stats.recentSections = state.sections.slice().sort(function (a, b) {
             return (b.timestamp || 0) - (a.timestamp || 0);
           });
 
-          state.sections.forEach(function(section) {
-            if (section.screens) stats.totalScreens += section.screens.length || 0;
-            if (section.screenCount) stats.totalScreens += section.screenCount;
-            if (section.apis) stats.totalAPIs += section.apis.length || 0;
+          state.sections.forEach(function (section) {
             if (section.apiCount) stats.totalAPIs += section.apiCount;
+            else if (section.apis) stats.totalAPIs += section.apis.length || 0;
           });
         }
 
+        // Count actual captured screens from mainTree (uses backend hasUI/hasAPI flags)
         if (typeof state !== 'undefined' && state.mainTree) {
-          var nodes = DashboardFeatures.search._flattenTree(state.mainTree);
-          if (stats.totalScreens === 0) stats.totalScreens = nodes.length;
+          var countFromTree = function (nodes) {
+            if (!nodes) return;
+            nodes.forEach(function (node) {
+              // Use backend flags if available
+              if (node.type === 'ui') {
+                if (node.hasUI) stats.screensWithUI++;
+                if (node.hasAPI) stats.screensWithAPI++;
+              }
+              if (node.children) countFromTree(node.children);
+            });
+          };
+          countFromTree(state.mainTree);
         }
 
-        // Try to get storage size from API
-        if (typeof api !== 'undefined' && api.getStorageInfo) {
-          api.getStorageInfo(state.currentProject).then(function(info) {
-            stats.storageSize = info.size || info.formattedSize || '--';
-            resolve(stats);
-          }).catch(function() {
-            resolve(stats);
-          });
-        } else {
-          resolve(stats);
+        // Count total screens from mainTree (all type='ui' nodes = screens defined in flow.json)
+        if (typeof state !== 'undefined' && state.mainTree) {
+          var countTotalScreens = function (nodes) {
+            if (!nodes) return;
+            nodes.forEach(function (node) {
+              if (node.type === 'ui') stats.totalScreens++;
+              if (node.children) countTotalScreens(node.children);
+            });
+          };
+          countTotalScreens(state.mainTree);
         }
+
+        // Async data fetches
+        var promises = [];
+
+        // Storage size
+        if (typeof api !== 'undefined' && api.getStorageInfo && typeof state !== 'undefined' && state.currentProject) {
+          promises.push(
+            api.getStorageInfo(state.currentProject).then(function (info) {
+              stats.storageSize = info.size || info.formattedSize || '--';
+            }).catch(function () { })
+          );
+        }
+
+        Promise.all(promises).then(function () {
+          // Fallback: if no screens found in tree
+          if (stats.totalScreens === 0) {
+            stats.totalScreens = stats.screensWithUI;
+          }
+          resolve(stats);
+        });
       });
     },
 
     _fetchTestResults() {
-      return new Promise(function(resolve) {
+      return new Promise(function (resolve) {
         var projectName = (typeof state !== 'undefined' && state.currentProject) ? state.currentProject : '';
         if (!projectName) { resolve([]); return; }
 
         fetch('/api/test-runner/results?project=' + encodeURIComponent(projectName))
-          .then(function(res) {
+          .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
           })
-          .then(function(data) {
+          .then(function (data) {
             resolve(Array.isArray(data) ? data : (data.results || []));
           })
-          .catch(function() {
+          .catch(function () {
             resolve([]);
           });
       });
@@ -1229,7 +1355,7 @@ const DashboardFeatures = {
       // Attach to existing HTML button IDs
       var captureBtn = document.getElementById('dashNewCapture');
       if (captureBtn && !captureBtn.dataset.handlerAttached) {
-        captureBtn.addEventListener('click', function() {
+        captureBtn.addEventListener('click', function () {
           if (typeof switchTab === 'function') switchTab('sitemap');
           if (DashboardFeatures.notifications) {
             DashboardFeatures.notifications.add('Action', 'Navigate to Sitemap for new capture', 'info');
@@ -1240,7 +1366,7 @@ const DashboardFeatures = {
 
       var compareBtn = document.getElementById('dashCompareAll');
       if (compareBtn && !compareBtn.dataset.handlerAttached) {
-        compareBtn.addEventListener('click', function() {
+        compareBtn.addEventListener('click', function () {
           if (typeof switchTab === 'function') switchTab('compare');
         });
         compareBtn.dataset.handlerAttached = 'true';
@@ -1248,7 +1374,7 @@ const DashboardFeatures = {
 
       var testBtn = document.getElementById('dashTestAll');
       if (testBtn && !testBtn.dataset.handlerAttached) {
-        testBtn.addEventListener('click', function() {
+        testBtn.addEventListener('click', function () {
           if (DashboardFeatures.notifications) {
             DashboardFeatures.notifications.add('Test Runner', 'Starting tests...', 'info');
           }
@@ -1257,13 +1383,13 @@ const DashboardFeatures = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ project: projectName })
-          }).then(function(res) { return res.json(); })
-            .then(function(data) {
+          }).then(function (res) { return res.json(); })
+            .then(function (data) {
               if (DashboardFeatures.notifications) {
                 DashboardFeatures.notifications.add('Test Runner', 'Tests completed: ' + (data.summary || JSON.stringify(data)), data.passed ? 'success' : 'warning');
               }
             })
-            .catch(function(err) {
+            .catch(function (err) {
               if (DashboardFeatures.notifications) {
                 DashboardFeatures.notifications.add('Test Runner', 'Tests failed: ' + err.message, 'error');
               }
@@ -1274,8 +1400,62 @@ const DashboardFeatures = {
 
       var exportBtn = document.getElementById('dashExport');
       if (exportBtn && !exportBtn.dataset.handlerAttached) {
-        exportBtn.addEventListener('click', function() {
-          if (typeof switchTab === 'function') switchTab('reports');
+        exportBtn.addEventListener('click', function () {
+          if (typeof state === 'undefined' || !state.currentProject) {
+            if (typeof showToast === 'function') showToast('Vui lòng chọn project trước', 'warning');
+            return;
+          }
+
+          // Generate report from available data
+          var report = {
+            project: state.currentProject,
+            exportedAt: new Date().toISOString(),
+            sections: (state.sections || []).map(function (s) {
+              return { name: s.name || s, timestamp: s.timestamp || null };
+            }),
+            stats: {
+              totalScreens: document.getElementById('dashTotalScreens') ? document.getElementById('dashTotalScreens').textContent : '0',
+              totalAPIs: document.getElementById('dashTotalAPIs') ? document.getElementById('dashTotalAPIs').textContent : '0',
+              totalSections: document.getElementById('dashTotalSections') ? document.getElementById('dashTotalSections').textContent : '0',
+              storageSize: document.getElementById('dashStorageSize') ? document.getElementById('dashStorageSize').textContent : '0'
+            },
+            screens: [],
+            apis: []
+          };
+
+          // Extract screen & API data from mainTree
+          if (state.mainTree) {
+            var extractData = function (nodes, parentPath) {
+              nodes.forEach(function (n) {
+                var currentPath = parentPath ? parentPath + '/' + n.name : n.name;
+                if (n.name === 'UI' && n.children) {
+                  n.children.forEach(function (screen) {
+                    report.screens.push({ name: screen.name, path: currentPath + '/' + screen.name });
+                  });
+                }
+                if (n.name === 'APIs' && n.children) {
+                  n.children.forEach(function (api) {
+                    report.apis.push({ name: api.name, path: currentPath + '/' + api.name, method: api.method || 'GET' });
+                  });
+                }
+                if (n.children) extractData(n.children, currentPath);
+              });
+            };
+            extractData(state.mainTree, '');
+          }
+
+          // Download as JSON
+          var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = state.currentProject + '_report_' + new Date().toISOString().slice(0, 10) + '.json';
+          a.click();
+          URL.revokeObjectURL(url);
+
+          if (typeof showToast === 'function') {
+            showToast('Đã xuất báo cáo ' + state.currentProject, 'success');
+          }
         });
         exportBtn.dataset.handlerAttached = 'true';
       }
@@ -1283,8 +1463,8 @@ const DashboardFeatures = {
       // Also attach handler to Run All Tests button in Test Results section
       var runTestsBtn = document.getElementById('dashRunTestsBtn');
       if (runTestsBtn && !runTestsBtn.dataset.handlerAttached) {
-        runTestsBtn.addEventListener('click', function() {
-          if (typeof switchTab === 'function') switchTab('testrunner');
+        runTestsBtn.addEventListener('click', function () {
+          if (typeof switchTab === 'function') switchTab('testing');
         });
         runTestsBtn.dataset.handlerAttached = 'true';
       }
@@ -1681,110 +1861,43 @@ const DashboardFeatures = {
 // =========================================================================
 //  AUTO-INIT & BRIDGE TO EXISTING HTML ELEMENTS
 // =========================================================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   // Initialize dashboard features
   DashboardFeatures.init();
 
   // Bridge: Connect existing HTML header buttons to DashboardFeatures handlers
-  // NOTE: Theme toggle is handled by theme-manager.js, don't add duplicate listener
-  /*
-  var themeToggleBtn = document.getElementById('themeToggleBtn');
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', function() {
-      DashboardFeatures.theme.toggle();
-      // Update the HTML icons
-      var sunIcon = document.getElementById('themeIconSun');
-      var moonIcon = document.getElementById('themeIconMoon');
-      if (sunIcon && moonIcon) {
-        if (DashboardFeatures.theme.current === 'dark') {
-          sunIcon.style.display = 'none';
-          moonIcon.style.display = 'block';
-        } else {
-          sunIcon.style.display = 'block';
-          moonIcon.style.display = 'none';
-        }
-      }
-    });
-    // Apply initial icon state
-    var sunIcon = document.getElementById('themeIconSun');
-    var moonIcon = document.getElementById('themeIconMoon');
-    if (sunIcon && moonIcon) {
-      if (DashboardFeatures.theme.current === 'dark') {
-        sunIcon.style.display = 'none';
-        moonIcon.style.display = 'block';
-      } else {
-        sunIcon.style.display = 'block';
-        moonIcon.style.display = 'none';
-      }
-    }
-  }
-  */
-
   var globalSearchBtn = document.getElementById('globalSearchBtn');
   if (globalSearchBtn) {
-    globalSearchBtn.addEventListener('click', function() {
+    globalSearchBtn.addEventListener('click', function () {
       DashboardFeatures.search.open();
     });
   }
 
   var shortcutsHelpBtn = document.getElementById('shortcutsHelpBtn');
   if (shortcutsHelpBtn) {
-    shortcutsHelpBtn.addEventListener('click', function() {
+    shortcutsHelpBtn.addEventListener('click', function () {
       DashboardFeatures.shortcuts.showHelp();
     });
   }
 
   var notificationBellBtn = document.getElementById('notificationBellBtn');
   if (notificationBellBtn) {
-    notificationBellBtn.addEventListener('click', function() {
+    notificationBellBtn.addEventListener('click', function () {
       DashboardFeatures.notifications.toggle();
     });
   }
 
   var markAllReadBtn = document.getElementById('markAllReadBtn');
   if (markAllReadBtn) {
-    markAllReadBtn.addEventListener('click', function() {
+    markAllReadBtn.addEventListener('click', function () {
       DashboardFeatures.notifications.markAllRead();
     });
   }
 
-  // Bridge: Dashboard tab quick actions
-  var dashNewCapture = document.getElementById('dashNewCapture');
-  if (dashNewCapture) {
-    dashNewCapture.addEventListener('click', function() {
-      var modal = document.getElementById('newSectionModal');
-      if (modal && typeof openModal === 'function') openModal(modal);
-    });
-  }
-
-  var dashCompareAll = document.getElementById('dashCompareAll');
-  if (dashCompareAll) {
-    dashCompareAll.addEventListener('click', function() {
-      if (typeof switchTab === 'function') switchTab('compare');
-    });
-  }
-
-  var dashTestAll = document.getElementById('dashTestAll');
-  if (dashTestAll) {
-    dashTestAll.addEventListener('click', function() {
-      if (state && state.currentProject) {
-        showToast('Running tests for ' + state.currentProject + '...', 'info');
-      }
-    });
-  }
-
-  var dashExport = document.getElementById('dashExport');
-  if (dashExport) {
-    dashExport.addEventListener('click', function() {
-      if (state && state.currentProject) {
-        window.open('/api/share/export/' + encodeURIComponent(state.currentProject), '_blank');
-      }
-    });
-  }
 
   var dashRunTestsBtn = document.getElementById('dashRunTestsBtn');
   if (dashRunTestsBtn) {
-    dashRunTestsBtn.addEventListener('click', function() {
+    dashRunTestsBtn.addEventListener('click', function () {
       if (state && state.currentProject) {
         showToast('Running all tests...', 'info');
       }
@@ -1794,28 +1907,28 @@ document.addEventListener('DOMContentLoaded', function() {
   // Bridge: Bulk operations toolbar buttons
   var bulkSelectAll = document.getElementById('bulkSelectAll');
   if (bulkSelectAll) {
-    bulkSelectAll.addEventListener('click', function() {
+    bulkSelectAll.addEventListener('click', function () {
       DashboardFeatures.bulk.selectAll();
     });
   }
 
   var bulkDeselectAll = document.getElementById('bulkDeselectAll');
   if (bulkDeselectAll) {
-    bulkDeselectAll.addEventListener('click', function() {
+    bulkDeselectAll.addEventListener('click', function () {
       DashboardFeatures.bulk.deselectAll();
     });
   }
 
   var bulkMerge = document.getElementById('bulkMerge');
   if (bulkMerge) {
-    bulkMerge.addEventListener('click', function() {
+    bulkMerge.addEventListener('click', function () {
       DashboardFeatures.bulk.mergeSelected();
     });
   }
 
   var bulkDelete = document.getElementById('bulkDelete');
   if (bulkDelete) {
-    bulkDelete.addEventListener('click', function() {
+    bulkDelete.addEventListener('click', function () {
       DashboardFeatures.bulk.deleteSelected();
     });
   }
@@ -1823,9 +1936,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Dashboard tab: Load data when project changes
   var projectSelect = document.getElementById('projectSelect');
   if (projectSelect) {
-    projectSelect.addEventListener('change', function() {
+    projectSelect.addEventListener('change', function () {
       // Update dashboard stats when project changes
-      setTimeout(function() {
+      setTimeout(function () {
         if (state && state.activeTab === 'dashboard') {
           DashboardFeatures.analytics.loadDashboard();
         }
@@ -1845,7 +1958,7 @@ function updateDashboardStats() {
   // Count from mainTree
   if (state.mainTree && Array.isArray(state.mainTree)) {
     function countNodes(nodes) {
-      nodes.forEach(function(node) {
+      nodes.forEach(function (node) {
         if (node.type === 'file' || node.hasScreenshot || node.path) totalScreens++;
         if (node.children) countNodes(node.children);
       });
@@ -1855,7 +1968,7 @@ function updateDashboardStats() {
 
   // Count from sections
   var sectionCount = state.sections ? state.sections.length : 0;
-  state.sections && state.sections.forEach(function(s) {
+  state.sections && state.sections.forEach(function (s) {
     totalAPIs += (s.apiCount || 0);
   });
 
@@ -1869,12 +1982,12 @@ function updateDashboardStats() {
 
   // Update storage size
   if (typeof api !== 'undefined' && api.getProjectSize) {
-    api.getProjectSize(state.currentProject).then(function(size) {
+    api.getProjectSize(state.currentProject).then(function (size) {
       var dashStorageSize = document.getElementById('dashStorageSize');
       if (dashStorageSize && size) {
         dashStorageSize.textContent = size.totalFormatted || size.total || '0 KB';
       }
-    }).catch(function() {});
+    }).catch(function () { });
   }
 
   // Update activity timeline
@@ -1886,13 +1999,13 @@ function updateActivityTimeline() {
   if (!timeline || !state || !state.sections) return;
 
   if (state.sections.length === 0) {
-    timeline.innerHTML = '<div class="empty-state" style="padding:24px;"><p>No recent activity</p></div>';
+    timeline.innerHTML = '<div class="empty-state" style="padding:24px;"><p>Chưa có hoạt động gần đây</p></div>';
     return;
   }
 
   var html = '';
   var recent = state.sections.slice(0, 10);
-  recent.forEach(function(section) {
+  recent.forEach(function (section) {
     var timestamp = typeof formatTimestamp === 'function' ? formatTimestamp(section.timestamp) : section.timestamp;
     var isReplay = String(section.timestamp).includes('_replay');
     var dotClass = isReplay ? 'dot-info' : 'dot-success';

@@ -22,6 +22,7 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const fs = require('fs-extra');
+const crypto = require('crypto');
 const storageService = require('./storage.service');
 
 const CHROME_DEBUG_PORT = 9222;
@@ -314,6 +315,50 @@ class UnifiedCaptureService {
 
             const pendingRequests = new Map();
 
+            // ═══════════════════════════════════════
+            // SMART CAPTURE: Tracker/Analytics blocking
+            // ═══════════════════════════════════════
+            const trackerPatterns = [
+                /google-analytics\.com/i,
+                /googletagmanager\.com/i,
+                /gtag\/js/i,
+                /analytics\.google\.com/i,
+                /facebook\.com\/tr/i,
+                /connect\.facebook\.net/i,
+                /pixel\.facebook\.com/i,
+                /doubleclick\.net/i,
+                /hotjar\.com/i,
+                /clarity\.ms/i,
+                /sentry\.io\/api/i,
+                /amplitude\.com/i,
+                /mixpanel\.com/i,
+                /segment\.io/i,
+                /segment\.com/i,
+                /intercom\.io/i,
+                /crisp\.chat/i,
+                /tawk\.to/i,
+                /newrelic\.com/i,
+                /datadog/i,
+                /bugsnag/i,
+                /rollbar\.com/i,
+                /fullstory\.com/i,
+                /logrocket/i,
+                /appsflyer\.com/i,
+                /branch\.io/i,
+                /bat\.bing\.com/i,
+                /ads\.linkedin\.com/i,
+                /snap\.licdn\.com/i
+            ];
+
+            const isTracker = (url) => trackerPatterns.some(p => p.test(url));
+
+            // ═══════════════════════════════════════
+            // SMART CAPTURE: API response deduplication
+            // ═══════════════════════════════════════
+            const apiResponseHashes = new Map(); // hash → count
+            let trackerBlockedCount = 0;
+            let dedupCount = 0;
+
             // Request started
             this.cdpSession.on('Network.requestWillBeSent', (params) => {
                 const { requestId, request, type, documentURL } = params;
@@ -324,26 +369,43 @@ class UnifiedCaptureService {
                     ['XHR', 'Fetch'].includes(type);
 
                 if (isAPI) {
-                    // Use CDP documentURL (the document that initiated this request)
-                    // which is more reliable than this.page.url() during SPA navigation
+                    // Smart Capture: Skip tracker/analytics URLs
+                    if (isTracker(request.url)) {
+                        trackerBlockedCount++;
+                        debugLog(`[API] 🚫 Blocked tracker: ${this.shortenUrl(request.url)}`);
+                        return;
+                    }
+
                     const originUrl = documentURL || this.page?.url() || '';
 
                     const apiEntry = {
                         id: requestId,
                         method: request.method,
                         url: request.url,
-                        // Save ALL headers for complete testing
                         reqHeaders: this.extractHeaders(request.headers),
-                        // Save full request body (no truncation)
                         requestBody: this.parseRequestBody(request.postData),
                         time: Date.now(),
-                        // Screen assignment - which URL was active when this API fired
                         originUrl: originUrl,
                         originPath: this.extractPath(originUrl)
                     };
 
                     pendingRequests.set(requestId, apiEntry);
-                    debugLog(`[API] 📤 ${request.method} ${this.shortenUrl(request.url)}`);
+
+                    // CDP may not include postData in the event even for POST requests.
+                    // When hasPostData is true but postData is missing, fetch it explicitly.
+                    // Store the promise so loadingFinished can await it before saving.
+                    if (!request.postData && request.hasPostData) {
+                        apiEntry._postDataPromise = this.cdpSession.send('Network.getRequestPostData', { requestId })
+                            .then(({ postData }) => {
+                                if (postData) {
+                                    apiEntry.requestBody = this.parseRequestBody(postData);
+                                    debugLog(`[API] 📦 Fetched postData for ${this.shortenUrl(request.url)}`);
+                                }
+                            })
+                            .catch(() => { /* requestId may no longer be valid */ });
+                    }
+
+                    debugLog(`[API] 📤 ${request.method} ${this.shortenUrl(request.url)}${request.hasPostData && !request.postData ? ' (postData pending)' : ''}`);
                 }
             });
 
@@ -366,27 +428,52 @@ class UnifiedCaptureService {
                 const apiEntry = pendingRequests.get(requestId);
 
                 if (apiEntry) {
+                    // Wait for any pending postData fetch to complete before saving
+                    if (apiEntry._postDataPromise) {
+                        await apiEntry._postDataPromise;
+                        delete apiEntry._postDataPromise;
+                    }
+
                     try {
                         const { body, base64Encoded } = await this.cdpSession.send('Network.getResponseBody', { requestId });
                         if (body) {
                             let responseBody = base64Encoded ? Buffer.from(body, 'base64').toString('utf-8') : body;
-                            // Try JSON parse for structured comparison
                             try {
                                 apiEntry.responseBody = JSON.parse(responseBody);
                             } catch {
-                                // Keep as raw string - NO TRUNCATION for testing
                                 apiEntry.responseBody = responseBody;
                             }
                         }
                     } catch (e) { /* ignore - body may not be available */ }
 
                     apiEntry.duration = Date.now() - apiEntry.time;
+
+                    // Smart Capture: API deduplication by hash
+                    const dedupKey = `${apiEntry.method}:${apiEntry.url}:${apiEntry.status}`;
+                    const bodyStr = typeof apiEntry.responseBody === 'object'
+                        ? JSON.stringify(apiEntry.responseBody)
+                        : String(apiEntry.responseBody || '');
+                    const hash = crypto.createHash('md5').update(dedupKey + bodyStr).digest('hex');
+
+                    const prevCount = apiResponseHashes.get(hash) || 0;
+                    apiResponseHashes.set(hash, prevCount + 1);
+
+                    if (prevCount > 0) {
+                        // Duplicate response — store lightweight marker instead of full body
+                        apiEntry.deduplicated = true;
+                        apiEntry.dedupHash = hash;
+                        apiEntry.dedupOccurrence = prevCount + 1;
+                        // Keep responseBody for first occurrence, strip for duplicates
+                        apiEntry.responseBody = `[DEDUP #${prevCount + 1}] Same as previous ${apiEntry.method} ${this.shortenUrl(apiEntry.url)}`;
+                        dedupCount++;
+                        debugLog(`[API] ♻️ Dedup #${prevCount + 1}: ${apiEntry.method} ${this.shortenUrl(apiEntry.url)}`);
+                    }
+
                     this.pendingAPIs.push(apiEntry);
                     this.allSessionAPIs.push(apiEntry);
                     this.sessionAPICount++;
                     pendingRequests.delete(requestId);
 
-                    // Stream to disk for crash safety
                     if (this.streamWriter) {
                         this.streamWriter.appendAPI(apiEntry);
                     }
@@ -396,11 +483,17 @@ class UnifiedCaptureService {
             });
 
             // Request failed
-            this.cdpSession.on('Network.loadingFailed', (params) => {
+            this.cdpSession.on('Network.loadingFailed', async (params) => {
                 const { requestId, errorText } = params;
                 const apiEntry = pendingRequests.get(requestId);
 
                 if (apiEntry) {
+                    // Wait for any pending postData fetch
+                    if (apiEntry._postDataPromise) {
+                        await apiEntry._postDataPromise;
+                        delete apiEntry._postDataPromise;
+                    }
+
                     apiEntry.status = 0;
                     apiEntry.error = errorText;
                     apiEntry.duration = Date.now() - apiEntry.time;
@@ -419,7 +512,7 @@ class UnifiedCaptureService {
                 }
             });
 
-            console.log('[UnifiedCapture] ✅ CDP Network capture enabled (Full Data Mode)');
+            console.log('[UnifiedCapture] ✅ CDP Network capture enabled (Full Data Mode + Smart Filtering)');
         } catch (e) {
             console.log('[UnifiedCapture] ⚠️ CDP setup failed:', e.message);
         }

@@ -32,12 +32,25 @@ const VersionUI = {
   // INIT
   // ================================================================
   init() {
+    this._historyLoaded = false;
+    this._collapsed = true; // Default collapsed
     this.injectStyles();
     this.createVersionPanel();
     this.addCommitButton();
+    // Don't load history on init — lazy load on first expand
+  },
 
-    // Auto-load history when project changes
-    if (state.currentProject) {
+  togglePanel() {
+    this._collapsed = !this._collapsed;
+    const panel = this.panelEl;
+    if (!panel) return;
+    const body = panel.querySelector('.version-panel-body');
+    const arrow = panel.querySelector('.version-toggle-arrow');
+    if (body) body.style.display = this._collapsed ? 'none' : 'block';
+    if (arrow) arrow.style.transform = this._collapsed ? '' : 'rotate(90deg)';
+    // Lazy load on first expand
+    if (!this._collapsed && !this._historyLoaded && state.currentProject) {
+      this._historyLoaded = true;
       this.loadHistory(1);
     }
   },
@@ -50,16 +63,27 @@ const VersionUI = {
     const style = document.createElement('style');
     style.id = 'version-ui-styles';
     style.textContent = `
-      /* Version Panel */
+      /* Version Panel & Timeline Design */
       .version-panel {
-        padding: 12px;
+        padding: 0;
         border-top: 1px solid var(--border-color);
+        background: transparent;
+      }
+      .version-panel-body {
+        max-height: 33vh;
+        overflow-y: auto;
+      }
+      .version-toggle-arrow {
+        transition: transform 0.2s;
+        display: inline-flex;
       }
       .version-panel-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        padding: 12px 16px;
+        background: rgba(0,0,0,0.1);
+        border-bottom: 1px solid var(--border-color);
       }
       .version-panel-title {
         font-size: 13px;
@@ -74,123 +98,172 @@ const VersionUI = {
         align-items: center;
         gap: 4px;
         font-size: 11px;
-        padding: 3px 10px;
-        border-radius: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
         border: 1px solid var(--accent-primary);
-        background: rgba(102,126,234,0.1);
-        color: var(--accent-primary);
+        background: var(--accent-primary);
+        color: #fff !important;
         cursor: pointer;
         font-weight: 500;
-        transition: background 0.15s;
+        transition: all 0.2s;
       }
       .version-commit-btn:hover {
-        background: rgba(102,126,234,0.25);
+        filter: brightness(1.1);
+        box-shadow: 0 0 12px rgba(102,126,234,0.3);
       }
 
-      /* Timeline */
-      .version-timeline {
-        position: relative;
-        padding-left: 20px;
+      .version-search {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border-color);
       }
-      .version-timeline::before {
-        content: '';
-        position: absolute;
-        left: 7px;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: var(--border-color);
+      .version-search input {
+        width: 100%;
+        padding: 6px 10px;
+        font-size: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .version-search input:focus {
+        border-color: var(--accent-primary);
+      }
+
+      /* GitHub-like timeline */
+      .version-timeline {
+        padding: 12px 0 20px 0;
+        position: relative;
       }
       .version-item {
         position: relative;
-        margin-bottom: 16px;
+        padding: 8px 16px 8px 42px;
+        transition: background 0.1s;
+        border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+        background: transparent !important;
+        margin: 0 !important;
       }
+      .version-item:hover {
+        background: rgba(255,255,255,0.02) !important;
+      }
+      .version-item::before {
+        content: "";
+        position: absolute;
+        left: 20px;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: rgba(255,255,255,0.08);
+      }
+      .version-item:first-child::before { top: 16px; }
+      .version-item:last-child::before { bottom: calc(100% - 16px); }
+
       .version-dot {
         position: absolute;
-        left: -20px;
-        top: 4px;
-        width: 12px;
-        height: 12px;
+        left: 17px;
+        top: 16px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
-        background: var(--text-muted);
-        border: 2px solid var(--bg-secondary);
+        background: var(--text-muted, #445);
+        border: 1px solid var(--bg-primary, #0f0f1a);
         z-index: 1;
       }
-      .version-dot.dot-tagged {
+      .version-item:hover .version-dot {
         background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 5px var(--accent-primary);
       }
-      .version-dot.dot-rollback {
-        background: var(--warning);
+
+      .version-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: transparent !important;
       }
       .version-message {
         font-size: 13px;
         font-weight: 500;
-        color: var(--text-primary);
-        word-break: break-word;
+        color: var(--text-primary, #fff) !important;
+        line-height: 1.4;
       }
       .version-meta {
         font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-      .version-tag {
-        display: inline-block;
-        font-size: 10px;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: rgba(102,126,234,0.15);
-        color: var(--accent-primary);
-        margin-top: 4px;
-      }
-      .version-actions {
+        color: var(--text-muted, #667) !important;
         display: flex;
-        gap: 4px;
-        margin-top: 6px;
+        align-items: center;
+        gap: 8px;
       }
-      .version-action-btn {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 4px;
-        border: 1px solid var(--border-color);
-        background: none;
-        color: var(--text-secondary);
-        cursor: pointer;
+      .version-author {
+        color: var(--text-secondary, #a0a0b0);
+        font-weight: 500;
+      }
+      .version-hash {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        color: var(--accent-primary, #667eea);
+        font-weight: 600;
+        opacity: 0.8;
+      }
+
+      .version-actions {
+        display: inline-flex;
+        gap: 2px;
+        margin-left: auto;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      .version-item:hover .version-actions {
+        opacity: 1;
+      }
+      .version-act {
+        width: 22px;
+        height: 22px;
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        transition: all 0.15s;
+        justify-content: center;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0;
+        transition: all 0.1s;
       }
-      .version-action-btn:hover {
-        background: var(--bg-glass);
-        color: var(--text-primary);
+      .version-act:hover {
+        background: rgba(255,255,255,0.08);
+        color: var(--accent-primary);
       }
-      .version-action-btn.danger:hover {
-        color: var(--danger);
-        border-color: var(--danger);
+      .version-act.act-danger:hover {
+        color: var(--danger, #f44);
+        background: rgba(255,68,68,0.1);
       }
+
       .version-load-more {
+        padding: 16px;
         text-align: center;
-        margin-top: 8px;
       }
       .version-load-more-btn {
+        width: 100%;
         font-size: 12px;
-        padding: 4px 16px;
-        border-radius: 4px;
+        padding: 6px;
+        border-radius: 6px;
+        background: var(--bg-secondary);
         border: 1px solid var(--border-color);
-        background: none;
         color: var(--text-secondary);
         cursor: pointer;
-        transition: all 0.15s;
       }
       .version-load-more-btn:hover {
-        background: var(--bg-glass);
+        background: var(--bg-tertiary);
         color: var(--text-primary);
       }
+
       .version-empty {
+        padding: 40px 20px;
+        text-align: center;
         font-size: 12px;
         color: var(--text-muted);
-        text-align: center;
-        padding: 20px 0;
       }
       .version-search {
         margin-bottom: 10px;
@@ -502,26 +575,34 @@ const VersionUI = {
     panel.id = 'versionPanel';
     this.panelEl = panel;
 
-    // Header
+    // Header (clickable to toggle)
     const header = document.createElement('div');
     header.className = 'version-panel-header';
+    header.style.cursor = 'pointer';
     header.innerHTML = `
       <span class="version-panel-title">
+        <span class="version-toggle-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l5 4-5 4z" fill="currentColor"/></svg></span>
         ${this.icons.history}
         Version History
       </span>
-      <button class="version-commit-btn" onclick="VersionUI.showCommitModal()" title="Commit current data">
+      <button class="version-commit-btn" onclick="event.stopPropagation(); VersionUI.showCommitModal()" title="Commit current data">
         ${this.icons.commit}
         Commit
       </button>
     `;
+    header.addEventListener('click', () => this.togglePanel());
     panel.appendChild(header);
+
+    // Body wrapper (collapsed by default)
+    const body = document.createElement('div');
+    body.className = 'version-panel-body';
+    body.style.display = 'none'; // Collapsed by default
 
     // Search
     const search = document.createElement('div');
     search.className = 'version-search';
     search.innerHTML = `<input type="text" placeholder="Search versions..." id="versionSearchInput" />`;
-    panel.appendChild(search);
+    body.appendChild(search);
 
     // Debounced search
     const searchInput = search.querySelector('input');
@@ -539,7 +620,7 @@ const VersionUI = {
     const timeline = document.createElement('div');
     timeline.className = 'version-timeline';
     timeline.id = 'versionTimeline';
-    panel.appendChild(timeline);
+    body.appendChild(timeline);
     this.timelineEl = timeline;
 
     // Load more container
@@ -548,7 +629,9 @@ const VersionUI = {
     loadMoreDiv.id = 'versionLoadMore';
     loadMoreDiv.style.display = 'none';
     loadMoreDiv.innerHTML = `<button class="version-load-more-btn" onclick="VersionUI.loadMore()">Load more</button>`;
-    panel.appendChild(loadMoreDiv);
+    body.appendChild(loadMoreDiv);
+
+    panel.appendChild(body);
 
     // Insert after mainTree
     mainTree.parentNode.insertBefore(panel, mainTree.nextSibling);
@@ -560,7 +643,7 @@ const VersionUI = {
   addCommitButton() {
     // Find the panel header that contains "Test All" or similar controls
     const leftPanelHeader = document.querySelector('.panel-header .panel-actions') ||
-                            document.querySelector('.left-panel .panel-header');
+      document.querySelector('.left-panel .panel-header');
     if (!leftPanelHeader) return;
 
     // Determine where to insert
@@ -595,43 +678,29 @@ const VersionUI = {
     }
 
     versions.forEach(v => {
+      const vId = v.id || v.versionId || '';
+      const shortId = vId.startsWith('v-') ? vId.substring(2, 9) : vId.substring(0, 7);
+
       const item = document.createElement('div');
       item.className = 'version-item';
-      item.dataset.versionId = v.id || v.versionId;
 
-      // Determine dot class
-      let dotClass = 'version-dot';
-      if (v.tag || v.tagName) dotClass += ' dot-tagged';
-      if (v.isRollback) dotClass += ' dot-rollback';
-
-      const tagHtml = (v.tag || v.tagName)
-        ? `<span class="version-tag">${this.escapeHtml(v.tag || v.tagName)}</span>`
-        : '';
-
-      const vId = v.id || v.versionId;
       const timeStr = this.timeAgo(v.createdAt || v.timestamp || v.date);
       const authorStr = this.escapeHtml(v.author || 'Unknown');
       const messageStr = this.escapeHtml(v.message || 'No message');
 
       item.innerHTML = `
-        <div class="${dotClass}"></div>
+        <div class="version-dot"></div>
         <div class="version-info">
           <div class="version-message">${messageStr}</div>
-          <div class="version-meta">${authorStr} \u00B7 ${timeStr}</div>
-          ${tagHtml}
-          <div class="version-actions" id="vActions_${vId}">
-            <button class="version-action-btn" onclick="VersionUI.rollback('${vId}')" title="Rollback to this version">
-              ${this.icons.rollback} Rollback
-            </button>
-            <button class="version-action-btn" onclick="VersionUI.showDiffModal('${vId}')" title="Compare with another version">
-              ${this.icons.diff} Diff
-            </button>
-            <button class="version-action-btn" onclick="VersionUI.showTagInput('${vId}')" title="Add tag">
-              ${this.icons.tag} Tag
-            </button>
-            <button class="version-action-btn danger" onclick="VersionUI.deleteVersion('${vId}')" title="Delete version">
-              ${this.icons.trash}
-            </button>
+          <div class="version-meta">
+            <span class="version-author">${authorStr}</span>
+            <span>committed ${timeStr}</span>
+            <span class="version-hash">${shortId}</span>
+            <span class="version-actions">
+              <button class="version-act" onclick="VersionUI.rollback('${vId}')" title="Rollback">${this.icons.rollback}</button>
+              <button class="version-act" onclick="VersionUI.showDiffModal('${vId}')" title="Compare">${this.icons.diff}</button>
+              <button class="version-act act-danger" onclick="VersionUI.deleteVersion('${vId}')" title="Delete">${this.icons.trash}</button>
+            </span>
           </div>
         </div>
       `;
@@ -778,10 +847,13 @@ const VersionUI = {
     }
 
     try {
-      const result = await api.fetch(url);
+      const res = await api.fetch(url);
 
-      if (result && !result.error) {
-        let versions = result.versions || result.data || [];
+      // Server wraps in { success, result: { versions, total, page, limit } }
+      const data = res && res.result ? res.result : res;
+
+      if (data && !data.error) {
+        let versions = data.versions || data.data || [];
 
         // Ensure versions is always an array
         if (!Array.isArray(versions)) {
@@ -789,9 +861,9 @@ const VersionUI = {
           versions = [];
         }
 
-        const totalItems = result.total || result.totalCount || versions.length;
+        const totalItems = data.total || data.totalCount || versions.length;
         this.currentPage = page;
-        this.totalPages = result.totalPages || Math.ceil(totalItems / limit) || 1;
+        this.totalPages = data.totalPages || Math.ceil(totalItems / limit) || 1;
         this.hasMore = page < this.totalPages;
 
         if (page === 1) {
@@ -946,12 +1018,14 @@ const VersionUI = {
     if (!resultsEl) return;
 
     try {
-      const result = await api.fetch(
+      const res = await api.fetch(
         `/api/versions/${encodeURIComponent(state.currentProject)}/diff/${encodeURIComponent(v1)}/${encodeURIComponent(v2)}`
       );
 
-      if (result && !result.error) {
-        const changes = result.changes || result.diffs || result || [];
+      if (res && !res.error) {
+        // Server wraps in { success, result: { added, removed, modified, unchanged } }
+        const data = res.result || res;
+        const changes = data.changes || data.diffs || data || [];
 
         if (!Array.isArray(changes) || changes.length === 0) {
           resultsEl.innerHTML = '<div class="version-empty">No differences found between these versions.</div>';
@@ -1009,7 +1083,7 @@ const VersionUI = {
         html += '</tbody></table>';
         resultsEl.innerHTML = html;
       } else {
-        resultsEl.innerHTML = `<div class="version-empty">Failed to load diff: ${this.escapeHtml(result.error || 'Unknown error')}</div>`;
+        resultsEl.innerHTML = `<div class="version-empty">Failed to load diff: ${this.escapeHtml(res.error || 'Unknown error')}</div>`;
       }
     } catch (err) {
       console.error('Diff error:', err);
@@ -1212,11 +1286,16 @@ const VersionUI = {
   // REFRESH (public helper)
   // ================================================================
   async refresh() {
+    this._historyLoaded = false;
     this.versions = [];
     this.currentPage = 1;
-    const searchInput = document.getElementById('versionSearchInput');
-    const search = searchInput ? searchInput.value.trim() : '';
-    await this.loadHistory(1, search || undefined);
+    // If panel is open, reload immediately
+    if (!this._collapsed && state.currentProject) {
+      this._historyLoaded = true;
+      const searchInput = document.getElementById('versionSearchInput');
+      const search = searchInput ? searchInput.value.trim() : '';
+      await this.loadHistory(1, search || undefined);
+    }
   }
 };
 

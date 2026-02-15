@@ -86,15 +86,26 @@ class VersionService {
         // Build manifest of all files in main directory
         const manifest = await this._buildManifest(mainPath);
 
-        // Copy all main data files to version data directory
+        // Copy all main data files in parallel batches
         let totalSize = 0;
-        for (const entry of manifest) {
-            const srcFile = path.join(mainPath, entry.relativePath);
-            const destFile = path.join(dataPath, entry.relativePath);
+        const COPY_CONCURRENCY = 8;
 
-            await fs.ensureDir(path.dirname(destFile));
-            await fs.copy(srcFile, destFile);
+        // Pre-collect unique directories to avoid redundant ensureDir calls
+        const dirsNeeded = new Set();
+        for (const entry of manifest) {
+            dirsNeeded.add(path.dirname(path.join(dataPath, entry.relativePath)));
             totalSize += entry.size;
+        }
+        await Promise.all([...dirsNeeded].map(d => fs.ensureDir(d)));
+
+        // Copy files in parallel batches
+        for (let i = 0; i < manifest.length; i += COPY_CONCURRENCY) {
+            const batch = manifest.slice(i, i + COPY_CONCURRENCY);
+            await Promise.all(batch.map(entry => {
+                const srcFile = path.join(mainPath, entry.relativePath);
+                const destFile = path.join(dataPath, entry.relativePath);
+                return fs.copy(srcFile, destFile);
+            }));
         }
 
         // Save manifest.json
@@ -562,40 +573,43 @@ class VersionService {
      * @returns {Promise<Array>} Array of file entries: [{ relativePath, checksum, size }]
      */
     async _buildManifest(dirPath) {
-        const manifest = [];
+        // Phase 1: Collect all file paths (fast, no I/O per file)
+        const filePaths = [];
 
-        const walkDir = async (currentPath, relativeTo) => {
-            if (!await fs.pathExists(currentPath)) {
-                return;
-            }
-
+        const walkDir = async (currentPath) => {
+            if (!await fs.pathExists(currentPath)) return;
             const entries = await fs.readdir(currentPath, { withFileTypes: true });
-
             for (const entry of entries) {
                 const fullPath = path.join(currentPath, entry.name);
-
                 if (entry.isDirectory()) {
-                    // Recurse into subdirectories
-                    await walkDir(fullPath, relativeTo);
+                    await walkDir(fullPath);
                 } else if (entry.isFile()) {
-                    const relativePath = path.relative(relativeTo, fullPath).replace(/\\/g, '/');
-                    const stats = await fs.stat(fullPath);
-                    const checksum = await this._generateChecksum(fullPath);
-
-                    manifest.push({
-                        relativePath,
-                        checksum,
-                        size: stats.size
-                    });
+                    filePaths.push(fullPath);
                 }
             }
         };
+        await walkDir(dirPath);
 
-        await walkDir(dirPath, dirPath);
+        // Phase 2: Parallel stat + checksum with concurrency limit
+        const CONCURRENCY = 8;
+        const manifest = [];
+        for (let i = 0; i < filePaths.length; i += CONCURRENCY) {
+            const batch = filePaths.slice(i, i + CONCURRENCY);
+            const results = await Promise.all(batch.map(async (fullPath) => {
+                const [stats, checksum] = await Promise.all([
+                    fs.stat(fullPath),
+                    this._generateChecksum(fullPath)
+                ]);
+                return {
+                    relativePath: path.relative(dirPath, fullPath).replace(/\\/g, '/'),
+                    checksum,
+                    size: stats.size
+                };
+            }));
+            manifest.push(...results);
+        }
 
-        // Sort by relative path for consistent ordering
         manifest.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-
         return manifest;
     }
 

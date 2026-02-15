@@ -90,6 +90,7 @@ const testRunnerRoutes = require('./src/routes/test-runner.routes');
 const reportRoutes = require('./src/routes/report.routes');
 const commentRoutes = require('./src/routes/comment.routes');
 const versionRoutes = require('./src/routes/version.routes');
+const proxyRequestRoutes = require('./src/routes/proxy-request.routes');
 
 // Register API routes
 app.use('/api/projects', projectRoutes);
@@ -105,6 +106,7 @@ app.use('/api/test-runner', testRunnerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/versions', versionRoutes);
+app.use('/api/proxy-request', proxyRequestRoutes);
 
 /**
  * HTML Page Routes

@@ -35,7 +35,7 @@
   // ========================================
 
   function initRippleEffect() {
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
       const btn = e.target.closest('.btn');
       if (!btn || btn.disabled) return;
 
@@ -50,7 +50,7 @@
 
       btn.appendChild(ripple);
 
-      ripple.addEventListener('animationend', function() {
+      ripple.addEventListener('animationend', function () {
         ripple.remove();
       }, { once: true });
     });
@@ -151,8 +151,8 @@
       el.innerHTML =
         '<span class="toast-icon">' + this._getIcon(type) + '</span>' +
         '<div class="toast-body">' +
-          (title ? '<div class="toast-title">' + title + '</div>' : '') +
-          '<div class="toast-message">' + message + '</div>' +
+        (title ? '<div class="toast-title">' + title + '</div>' : '') +
+        '<div class="toast-message">' + message + '</div>' +
         '</div>' +
         '<button class="toast-close" aria-label="Close">&times;</button>' +
         '<div class="toast-progress" style="width: 100%;"></div>';
@@ -294,13 +294,6 @@
     registerShortcut('ctrl+=', () => zoomAction('in'), 'Zoom In');
     registerShortcut('ctrl+-', () => zoomAction('out'), 'Zoom Out');
     registerShortcut('ctrl+0', () => zoomAction('reset'), 'Reset Zoom');
-
-    // Performance Monitor shortcut (Ctrl+P)
-    registerShortcut('ctrl+p', () => {
-      if (typeof window.togglePerformanceWidget === 'function') {
-        window.togglePerformanceWidget();
-      }
-    }, 'Toggle Performance Monitor');
   }
 
   function zoomAction(action) {

@@ -1,0 +1,183 @@
+/**
+ * Print Styles
+ * Optimized for printing documents - hide UI, show only content
+ */
+
+@media print {
+  /* Hide all UI elements */
+  .header,
+  .panel-left,
+  .panel-right,
+  .sidebar-tabs,
+  .sidebar-expand-btn,
+  .resizer,
+  .doc-toolbar,
+  .doc-sidebar,
+  .preview-full-title,
+  .compare-header,
+  .compare-selectors,
+  .doc-btn-primary,
+  .doc-btn-secondary,
+  button,
+  .loading-bar,
+  .toast-container,
+  .shortcuts-overlay,
+  .global-search-overlay,
+  .context-menu,
+  .notification-panel,
+  .perf-widget {
+    display: none !important;
+  }
+
+  /* Full width for content */
+  body {
+    margin: 0;
+    padding: 0;
+    background: white !important;
+  }
+
+  .main-content {
+    display: block !important;
+    background: white !important;
+  }
+
+  .panel-center {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Document content */
+  .preview-container {
+    background: white !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Excel tables */
+  .visual-excel-table,
+  .doc-excel-table {
+    page-break-inside: auto;
+    width: 100% !important;
+  }
+
+  .visual-excel-table tr,
+  .doc-excel-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .visual-excel-table th,
+  .visual-excel-table td,
+  .doc-excel-table th,
+  .doc-excel-table td {
+    border: 1px solid #000 !important;
+    padding: 4px 8px !important;
+    font-size: 10pt !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Word/HTML documents */
+  .doc-word-content,
+  .preview-html-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.5in !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  /* Text documents */
+  .doc-text-content {
+    width: 100% !important;
+    padding: 0.5in !important;
+    font-family: monospace !important;
+    font-size: 10pt !important;
+    white-space: pre-wrap !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  /* PDF - let browser handle natively */
+  .pdf-canvas-container {
+    width: 100% !important;
+  }
+
+  /* Comparison views - side by side */
+  .compare-panels {
+    display: flex !important;
+    gap: 0.25in !important;
+  }
+
+  .compare-panel {
+    flex: 1 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Diff highlighting - use grayscale for print */
+  .cell-add,
+  .diff-add {
+    background: #e0e0e0 !important;
+    border: 1px solid #999 !important;
+  }
+
+  .cell-remove,
+  .diff-remove {
+    background: #f0f0f0 !important;
+    text-decoration: line-through !important;
+  }
+
+  .cell-modify,
+  .diff-modify {
+    background: #d0d0d0 !important;
+    border: 1px solid #666 !important;
+  }
+
+  /* Page breaks */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+
+  table, figure, img {
+    page-break-inside: avoid;
+  }
+
+  /* Remove shadows and effects */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure links are visible */
+  a {
+    color: #000 !important;
+    text-decoration: underline !important;
+  }
+
+  /* Print URLs after links (optional) */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #666;
+  }
+
+  /* Don't print empty elements */
+  .empty-state,
+  .doc-empty {
+    display: none !important;
+  }
+}
+
+/* Landscape orientation for wide tables */
+@media print and (orientation: landscape) {
+  .visual-excel-table,
+  .doc-excel-table {
+    max-width: 100% !important;
+  }
+}

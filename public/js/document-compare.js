@@ -8,13 +8,15 @@ class DocumentCompare {
     this.currentDocument = null;
     this.documents = [];
     this.allDocuments = [];
-    this.categories = [
+    this.defaultCategories = [
       { id: 'all', name: 'Tat ca', icon: 'folder' },
       { id: 'requirements', name: 'Yeu cau', icon: 'file-text' },
       { id: 'test-cases', name: 'Test Cases', icon: 'check-square' },
       { id: 'reports', name: 'Bao cao', icon: 'bar-chart' },
       { id: 'uncategorized', name: 'Chua phan loai', icon: 'help-circle' }
     ];
+    this.customCategories = this._loadCustomCategories();
+    this.categories = [...this.defaultCategories, ...this.customCategories];
     this.currentCategory = 'all';
     this.viewMode = 'grid';
     this.searchQuery = '';
@@ -254,19 +256,73 @@ class DocumentCompare {
     const nav = document.getElementById('libSidebarNav');
     if (!nav) return;
 
+    const defaultIds = this.defaultCategories.map(c => c.id);
+
     nav.innerHTML = this.categories.map(cat => {
       const count = cat.id === 'all'
         ? this.allDocuments.length
         : this.allDocuments.filter(d => d.category === cat.id).length;
+      const isCustom = !defaultIds.includes(cat.id);
 
       return `
         <div class="doc-nav-item ${this.currentCategory === cat.id ? 'active' : ''}" onclick="docCompare.setCategory('${cat.id}')">
           ${this.getCategoryIcon(cat.icon)}
           <span style="flex:1">${cat.name}</span>
           ${count > 0 ? `<span class="doc-nav-count">${count}</span>` : ''}
+          ${isCustom ? `<button class="doc-nav-delete-btn" onclick="event.stopPropagation(); docCompare.deleteCategory('${cat.id}')" title="Xoa thu muc" style="background:none; border:none; color:var(--doc-text-muted); cursor:pointer; font-size:14px; padding:0 2px; line-height:1; opacity:0.5;">&times;</button>` : ''}
         </div>
       `;
-    }).join('');
+    }).join('') + `
+      <div class="doc-nav-item" onclick="docCompare.addCategory()" style="color:var(--doc-text-muted); border:1px dashed var(--doc-border); margin-top:0.5rem; justify-content:center; gap:4px; opacity:0.7;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Them thu muc
+      </div>
+    `;
+  }
+
+  _loadCustomCategories() {
+    try {
+      const key = `doc_custom_categories_${window.state?.currentProject || 'default'}`;
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (e) { return []; }
+  }
+
+  _saveCustomCategories() {
+    try {
+      const key = `doc_custom_categories_${window.state?.currentProject || 'default'}`;
+      localStorage.setItem(key, JSON.stringify(this.customCategories));
+    } catch (e) { /* */ }
+  }
+
+  addCategory() {
+    this.showPrompt('Nhap ten thu muc moi:', '', (name) => {
+      if (!name || !name.trim()) return;
+      const id = 'custom_' + Date.now();
+      const newCat = { id, name: name.trim(), icon: 'folder' };
+      this.customCategories.push(newCat);
+      this.categories = [...this.defaultCategories, ...this.customCategories];
+      this._saveCustomCategories();
+      this.renderSidebar();
+      this.showSuccess('Da them thu muc: ' + name.trim());
+    });
+  }
+
+  deleteCategory(catId) {
+    const cat = this.customCategories.find(c => c.id === catId);
+    if (!cat) return;
+    this.showCustomConfirm(`Xoa thu muc "${cat.name}"? Cac tai lieu ben trong se chuyen ve "Chua phan loai".`, () => {
+      this.allDocuments.forEach(doc => {
+        if (doc.category === catId) doc.category = 'uncategorized';
+      });
+      this.customCategories = this.customCategories.filter(c => c.id !== catId);
+      this.categories = [...this.defaultCategories, ...this.customCategories];
+      this._saveCustomCategories();
+      if (this.currentCategory === catId) this.currentCategory = 'all';
+      this.renderSidebar();
+      this.renderContent();
+      this.showSuccess('Da xoa thu muc: ' + cat.name);
+    });
   }
 
   getCategoryIcon(name) {
@@ -352,9 +408,10 @@ class DocumentCompare {
 
   renderFileName(doc) {
     const ext = doc.ext.replace('.', '');
+    const displayName = doc.displayName || doc.baseName;
     return `
       <div class="doc-file-name-wrapper">
-        <span class="doc-file-basename" title="${doc.name}">${this.escapeHtml(doc.baseName)}</span>
+        <span class="doc-file-basename" title="${doc.name}">${this.escapeHtml(displayName)}</span>
         <span class="file-ext-badge ext-${ext}">${ext}</span>
       </div>
     `;
@@ -409,6 +466,10 @@ class DocumentCompare {
     menu.style.left = `${event.clientX - 100}px`;
 
     menu.innerHTML = `
+      <div class="doc-menu-item" onclick="docCompare.renameDocument('${docId}')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+        Doi ten
+      </div>
       <div class="doc-menu-item" onclick="docCompare.downloadLatest('${docId}')">
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
         Tai ban moi nhat
@@ -420,6 +481,27 @@ class DocumentCompare {
     `;
 
     document.body.appendChild(menu);
+  }
+
+  async renameDocument(docId) {
+    document.querySelectorAll('.doc-dropdown').forEach(m => m.remove());
+    const doc = this.allDocuments.find(d => d.id === docId);
+    if (!doc) return;
+    const currentName = doc.displayName || doc.baseName;
+    this.showPrompt('Nhap ten moi:', currentName, async (newName) => {
+      if (!newName || !newName.trim() || newName.trim() === currentName) return;
+      try {
+        await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${docId}/rename`, {
+          method: 'PUT',
+          body: JSON.stringify({ displayName: newName.trim() })
+        });
+        doc.displayName = newName.trim();
+        this.renderContent();
+        this.showSuccess('Da doi ten thanh: ' + newName.trim());
+      } catch (e) {
+        this.showToast('Doi ten that bai: ' + e.message, 'error');
+      }
+    });
   }
 
   getFileIcon(type, small = false) {
@@ -480,10 +562,11 @@ class DocumentCompare {
   }
 
   async deleteDocument(id) {
-    if (!confirm('Xoa tai lieu nay?')) return;
-    await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${id}`, { method: 'DELETE' });
-    this.showToast('Da xoa tai lieu', 'success');
-    this.loadDocuments();
+    this.showCustomConfirm('Xoa tai lieu nay?', async () => {
+      await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${id}`, { method: 'DELETE' });
+      this.showToast('Da xoa tai lieu', 'success');
+      this.loadDocuments();
+    });
   }
 
   // --- Detail View ---
@@ -511,10 +594,12 @@ class DocumentCompare {
           </button>
           <div>
             <h2 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:6px;">
-              ${this.escapeHtml(doc.baseName)}
+              ${this.escapeHtml(doc.displayName || doc.baseName)}
               <span class="file-ext-badge ext-${doc.ext.replace('.', '')}">${doc.ext}</span>
             </h2>
-            <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; color:var(--doc-text-sub); margin-top:2px;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--doc-text-sub); margin-top:2px;">
+              <span style="opacity:0.7;" title="Ten file goc">📄 ${this.escapeHtml(doc.name)}</span>
+              <span style="opacity:0.3;">|</span>
               <span>Phan loai:</span>
               <select style="border:none; background:transparent; font-weight:500; cursor:pointer; color:var(--doc-primary); font-size:0.75rem; outline:none;" onchange="docCompare.updateDocCategory('${doc.id}', this.value)">
                 ${this.categories.filter(c => c.id !== 'all').map(c => `
@@ -525,11 +610,6 @@ class DocumentCompare {
           </div>
         </div>
         <div style="display:flex; gap:8px;">
-          <label class="doc-btn-primary" style="cursor:pointer;">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Upload phien ban moi
-            <input type="file" accept=".docx,.xlsx,.xls,.pdf,.txt,.csv" style="display:none" onchange="docCompare.uploadNewVersion(this)">
-          </label>
           ${doc.versions.length > 1 ? `
             <button class="doc-btn-primary" onclick="docCompare.startCompare()">
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
@@ -543,41 +623,54 @@ class DocumentCompare {
       </div>
 
       <div style="display:flex; flex:1; overflow:hidden;">
-        <!-- Versions Sidebar -->
-        <div style="width:260px; border-right:1px solid var(--doc-border); background:var(--doc-bg-app); display:flex; flex-direction:column;">
-          <div style="padding:0.75rem 1rem; font-weight:600; font-size:0.75rem; color:var(--doc-text-muted); text-transform:uppercase; letter-spacing:0.05em;">Lich su phien ban</div>
-          <div class="version-list" style="flex:1; overflow-y:auto; padding:0 0.75rem 0.75rem;">
-            ${[...doc.versions].reverse().map(v => `
-              <div class="doc-file-card version-card ${v.version === latestVersion.version ? 'active-version' : ''}"
-                   onclick="docCompare.previewVersion(${v.version})"
-                   style="margin-bottom:0.5rem; padding:0.65rem; cursor:pointer; align-items:flex-start; text-align:left; flex-direction:column; position:relative;">
-
-                <div style="display:flex; align-items:center; gap:6px; width:100%; margin-bottom:0.25rem;">
-                  <span class="doc-version-tag" style="font-size:0.7rem; ${v.version === latestVersion.version ? 'background:var(--doc-primary);color:white;border-color:var(--doc-primary);' : ''}">v${v.version}</span>
-                  <span style="font-size:0.7rem; color:var(--doc-text-muted);">${this.formatDate(v.uploadedAt)}</span>
-                </div>
-
-                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                  <span style="font-size:0.7rem; color:var(--doc-text-muted);">${this.formatSize(v.size)}</span>
-                  <div style="display:flex; gap:2px;">
-                    <button class="doc-btn-icon"
-                            style="width:24px; height:24px; border:none; background:transparent;"
-                            onclick="event.stopPropagation(); docCompare.downloadVersion(${v.version})"
-                            title="Download">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    </button>
-                    ${doc.versions.length > 1 ? `
-                      <button class="doc-btn-icon"
-                              style="width:24px; height:24px; border:none; background:transparent; color:var(--doc-danger);"
-                              onclick="event.stopPropagation(); docCompare.deleteVersion(${v.version})"
-                              title="Xoa phien ban nay">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        <!-- Versions Sidebar - Timeline Style -->
+        <div class="doc-version-sidebar">
+          <div class="doc-version-header">
+            <span class="doc-version-header-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Version History
+            </span>
+            <label class="doc-version-upload-btn" style="cursor:pointer;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+              Upload
+              <input type="file" accept=".docx,.xlsx,.xls,.pdf,.txt,.csv" style="display:none" onchange="docCompare.uploadNewVersion(this)">
+            </label>
+          </div>
+          <div class="doc-version-search">
+            <input type="text" placeholder="Search versions..." id="docVersionSearch" oninput="docCompare.filterVersions(this.value)">
+          </div>
+          <div class="doc-version-timeline" id="docVersionTimeline">
+            ${[...doc.versions].reverse().map(v => {
+      const isLatest = v.version === latestVersion.version;
+      const timeStr = this.timeAgo(v.uploadedAt);
+      const dateStr = this.formatDateShort(v.uploadedAt);
+      return `
+              <div class="doc-version-tl-item ${isLatest ? 'active-version' : ''}"
+                   onclick="docCompare.previewVersion(${v.version})">
+                <div class="doc-version-dot"></div>
+                <div class="doc-version-tl-info">
+                  <div class="doc-version-tl-title">
+                    v${v.version}
+                    ${isLatest ? '<span class="doc-version-tl-tag latest">latest</span>' : ''}
+                    <span class="doc-version-tl-actions">
+                      <button class="doc-version-tl-act" onclick="event.stopPropagation(); docCompare.downloadVersion(${v.version})" title="Download">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                       </button>
-                    ` : ''}
+                      ${doc.versions.length > 1 ? `
+                        <button class="doc-version-tl-act act-danger" onclick="event.stopPropagation(); docCompare.deleteVersion(${v.version})" title="Xoa phien ban">
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                      ` : ''}
+                    </span>
+                  </div>
+                  <div class="doc-version-tl-meta">
+                    <span class="doc-version-tl-size">${this.formatSize(v.size)}</span>
+                    <span>${timeStr}</span>
+                    <span class="doc-version-tl-date">${dateStr}</span>
                   </div>
                 </div>
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
         </div>
 
@@ -611,9 +704,10 @@ class DocumentCompare {
     const formData = new FormData();
     formData.append('file', file);
 
+    const docId = this.currentDocument.id;
     this.showToast('Dang upload phien ban moi...', 'info');
     try {
-      const res = await fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/upload`, {
+      const res = await fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/upload?docId=${encodeURIComponent(docId)}`, {
         method: 'POST',
         body: formData
       });
@@ -621,7 +715,7 @@ class DocumentCompare {
       if (data.success) {
         this.showToast('Upload phien ban moi thanh cong!', 'success');
         // Reload document and re-render detail view
-        await this.openDocument(this.currentDocument.id);
+        await this.openDocument(docId);
         this.loadDocuments();
       } else {
         this.showToast(data.error || 'Upload that bai', 'error');
@@ -634,15 +728,16 @@ class DocumentCompare {
 
   async deleteCurrentDocument() {
     if (!this.currentDocument) return;
-    if (!confirm('Xoa tai lieu nay va tat ca phien ban?')) return;
-    try {
-      await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${this.currentDocument.id}`, { method: 'DELETE' });
-      this.showToast('Da xoa tai lieu', 'success');
-      this.closeDetailView();
-      this.loadDocuments();
-    } catch (e) {
-      this.showToast('Xoa that bai: ' + e.message, 'error');
-    }
+    this.showCustomConfirm('Xoa tai lieu nay va tat ca phien ban?', async () => {
+      try {
+        await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${this.currentDocument.id}`, { method: 'DELETE' });
+        this.showToast('Da xoa tai lieu', 'success');
+        this.closeDetailView();
+        this.loadDocuments();
+      } catch (e) {
+        this.showToast('Xoa that bai: ' + e.message, 'error');
+      }
+    });
   }
 
   async deleteVersion(version) {
@@ -650,15 +745,16 @@ class DocumentCompare {
     if (this.currentDocument.versions.length <= 1) {
       return this.showToast('Khong the xoa phien ban cuoi cung. Hay xoa ca tai lieu.', 'error');
     }
-    if (!confirm(`Xoa phien ban v${version}?`)) return;
-    try {
-      await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${this.currentDocument.id}/${version}`, { method: 'DELETE' });
-      this.showToast(`Da xoa phien ban v${version}`, 'success');
-      await this.openDocument(this.currentDocument.id);
-      this.loadDocuments();
-    } catch (e) {
-      this.showToast('Xoa that bai: ' + e.message, 'error');
-    }
+    this.showCustomConfirm(`Xoa phien ban v${version}?`, async () => {
+      try {
+        await this._fetch(`/api/documents/${encodeURIComponent(window.state.currentProject)}/${this.currentDocument.id}/${version}`, { method: 'DELETE' });
+        this.showToast(`Da xoa phien ban v${version}`, 'success');
+        await this.openDocument(this.currentDocument.id);
+        this.loadDocuments();
+      } catch (e) {
+        this.showToast('Xoa that bai: ' + e.message, 'error');
+      }
+    });
   }
 
   // --- Preview ---
@@ -1151,7 +1247,7 @@ class DocumentCompare {
 
       if (lines.length > 0) {
         e.preventDefault();
-        navigator.clipboard.writeText(lines.join('\n')).catch(() => {});
+        navigator.clipboard.writeText(lines.join('\n')).catch(() => { });
         this.showToast(`Da copy ${maxR - minR + 1} dong x ${maxC - minC + 1} cot`, 'success');
       }
     };
@@ -1206,7 +1302,7 @@ class DocumentCompare {
         res.rows.forEach((row, i) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `<td class="excel-row-num">${startIdx + i + 1}</td>` +
-            Array.from({length: colCount}, (_, c) => {
+            Array.from({ length: colCount }, (_, c) => {
               const val = row[c];
               return `<td>${val !== null && val !== undefined ? this.escapeHtml(String(val)) : ''}</td>`;
             }).join('');
@@ -1357,13 +1453,959 @@ class DocumentCompare {
             <select id="v2Select" class="doc-search-input" style="width:auto; padding-left:10px;">
               ${versions.map(v => `<option value="${v.version}" ${v.version === v2 ? 'selected' : ''}>Phien ban ${v.version}</option>`).join('')}
             </select>
-            <button class="doc-btn-primary" onclick="docCompare.executeCompare()">So sanh</button>
+            <button class="doc-btn-primary" onclick="docCompare.executeVisualCompare()">So sanh</button>
           </div>
         </div>
         <div id="compareResult" class="compare-result"></div>
       </div>
     `;
-    this.executeCompare();
+    this.executeVisualCompare();
+  }
+
+  async executeVisualCompare() {
+    const v1 = document.getElementById('v1Select').value;
+    const v2 = document.getElementById('v2Select').value;
+    const container = document.getElementById('compareResult');
+    const docType = this.currentDocument.type;
+
+    container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:200px;gap:8px;color:var(--doc-text-sub);"><div class="doc-loading-spinner" style="padding:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div> Dang so sanh...</div>';
+
+    try {
+      const baseUrl = `/api/documents/${encodeURIComponent(window.state.currentProject)}/${this.currentDocument.id}`;
+
+      if (docType === 'excel') {
+        // Excel uses visual grid compare
+        const [prev1, prev2] = await Promise.all([
+          this._fetch(`${baseUrl}/${v1}/preview`),
+          this._fetch(`${baseUrl}/${v2}/preview`)
+        ]);
+        this._buildAndRenderExcelDiff(container, prev1, prev2, v1, v2);
+      } else if (docType === 'pdf') {
+        // PDF: Pure visual comparison with pixel-level diff — no text diff needed
+        const [prev1, prev2] = await Promise.all([
+          this._fetch(`${baseUrl}/${v1}/preview`),
+          this._fetch(`${baseUrl}/${v2}/preview`)
+        ]);
+        this._renderPdfVisualDiff(container, prev1, prev2, v1, v2);
+      } else {
+        // Text, Word, CSV — all use GitHub-style diff
+        const diffData = await this._fetch(`${baseUrl}/compare-text-diff?v1=${v1}&v2=${v2}`);
+        this._renderGithubDiff(container, diffData, v1, v2);
+      }
+    } catch (e) {
+      container.innerHTML = `<div class="doc-empty" style="color:var(--doc-danger);padding:2rem;"><p>Loi: ${e.message}</p></div>`;
+    }
+  }
+
+  // ===== GitHub-Style Diff Renderer (shared for all file types) =====
+  _renderGithubDiff(container, diffData, v1, v2, options = {}) {
+    const { stats, hunks, isTruncated, noChanges } = diffData;
+    const totalChanges = stats.added + stats.removed + stats.modified;
+
+    // Build stats bar
+    const statsHtml = `
+      <div class="gh-diff-stats">
+        <div class="gh-diff-stat-bar">
+          <span class="gh-stat-added">+${stats.added}</span>
+          <span class="gh-stat-removed">-${stats.removed}</span>
+          <span class="gh-stat-modified">~${stats.modified}</span>
+        </div>
+        <div class="gh-diff-stat-visual">
+          ${this._buildStatBlocks(stats)}
+        </div>
+      </div>
+    `;
+
+    if (noChanges) {
+      container.innerHTML = `
+        <div class="gh-diff-wrapper">
+          ${statsHtml}
+          <div class="gh-diff-empty">
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Khong co thay doi nao giua 2 phien ban</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Build diff table
+    let diffHtml = '';
+    let changeIdx = 0;
+    this._ghChangePositions = [];
+
+    for (const hunk of hunks) {
+      if (hunk.collapsed) {
+        diffHtml += `
+          <div class="gh-diff-collapse" data-collapsed="${hunk.collapsed}">
+            <div class="gh-diff-collapse-inner">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              <span>${hunk.collapsed} dong khong thay doi</span>
+            </div>
+          </div>
+        `;
+        continue;
+      }
+
+      for (const row of hunk.rows) {
+        const id = `gh-change-${changeIdx}`;
+
+        if (row.type === 'equal') {
+          diffHtml += `
+            <div class="gh-diff-row gh-equal">
+              <div class="gh-gutter gh-gutter-left">${row.leftNum}</div>
+              <div class="gh-gutter gh-gutter-right">${row.rightNum}</div>
+              <div class="gh-marker"></div>
+              <div class="gh-content">${this.escapeHtml(row.content)}</div>
+            </div>
+          `;
+        } else if (row.type === 'delete') {
+          this._ghChangePositions.push(id);
+          diffHtml += `
+            <div class="gh-diff-row gh-delete" id="${id}">
+              <div class="gh-gutter gh-gutter-left">${row.leftNum}</div>
+              <div class="gh-gutter gh-gutter-right"></div>
+              <div class="gh-marker">-</div>
+              <div class="gh-content">${this.escapeHtml(row.content)}</div>
+            </div>
+          `;
+          changeIdx++;
+        } else if (row.type === 'insert') {
+          this._ghChangePositions.push(id);
+          diffHtml += `
+            <div class="gh-diff-row gh-insert" id="${id}">
+              <div class="gh-gutter gh-gutter-left"></div>
+              <div class="gh-gutter gh-gutter-right">${row.rightNum}</div>
+              <div class="gh-marker">+</div>
+              <div class="gh-content">${this.escapeHtml(row.content)}</div>
+            </div>
+          `;
+          changeIdx++;
+        } else if (row.type === 'modify') {
+          this._ghChangePositions.push(id);
+          // Build word-highlighted content
+          const leftHtml = (row.leftParts || []).map(p =>
+            p.type === 'del' ? `<span class="gh-word-del">${this.escapeHtml(p.value)}</span>` : this.escapeHtml(p.value)
+          ).join('');
+          const rightHtml = (row.rightParts || []).map(p =>
+            p.type === 'ins' ? `<span class="gh-word-ins">${this.escapeHtml(p.value)}</span>` : this.escapeHtml(p.value)
+          ).join('');
+
+          diffHtml += `
+            <div class="gh-diff-row gh-modify-old" id="${id}">
+              <div class="gh-gutter gh-gutter-left">${row.leftNum}</div>
+              <div class="gh-gutter gh-gutter-right"></div>
+              <div class="gh-marker">-</div>
+              <div class="gh-content">${leftHtml}</div>
+            </div>
+            <div class="gh-diff-row gh-modify-new">
+              <div class="gh-gutter gh-gutter-left"></div>
+              <div class="gh-gutter gh-gutter-right">${row.rightNum}</div>
+              <div class="gh-marker">+</div>
+              <div class="gh-content">${rightHtml}</div>
+            </div>
+          `;
+          changeIdx++;
+        }
+      }
+    }
+
+    const extraClass = options.inTab ? '' : 'gh-diff-standalone';
+
+    container.innerHTML = `
+      <div class="gh-diff-wrapper ${extraClass}">
+        ${statsHtml}
+        ${isTruncated ? '<div class="overview-warning" style="margin:0.5rem 1rem;"><svg class="overview-warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><span>Noi dung qua dai, da cat bot.</span></div>' : ''}
+        <div class="gh-diff-nav">
+          <div class="gh-diff-legend">
+            <span class="gh-legend-item gh-legend-del">Xoa</span>
+            <span class="gh-legend-item gh-legend-ins">Them</span>
+            <span class="gh-legend-item gh-legend-mod">Sua</span>
+          </div>
+          <div class="diff-navigator">
+            <button class="diff-nav-btn" onclick="docCompare._ghNavigate(-1)" title="Thay doi truoc">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+            </button>
+            <span class="diff-nav-count" id="ghNavCount">0/${totalChanges}</span>
+            <button class="diff-nav-btn" onclick="docCompare._ghNavigate(1)" title="Thay doi tiep">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="gh-diff-table" id="ghDiffTable">${diffHtml}</div>
+      </div>
+    `;
+
+    this._ghCurrentIndex = -1;
+
+    // Bind collapse click handlers
+    container.querySelectorAll('.gh-diff-collapse').forEach(el => {
+      el.addEventListener('click', () => {
+        const count = parseInt(el.dataset.collapsed);
+        let html = '';
+        for (let i = 0; i < count; i++) {
+          html += `<div class="gh-diff-row gh-equal gh-expanded"><div class="gh-gutter gh-gutter-left">·</div><div class="gh-gutter gh-gutter-right">·</div><div class="gh-marker"></div><div class="gh-content" style="color:var(--doc-text-muted);font-style:italic;">...</div></div>`;
+        }
+        el.outerHTML = html;
+      });
+    });
+  }
+
+  _buildStatBlocks(stats) {
+    const total = stats.added + stats.removed + stats.modified;
+    if (total === 0) return '';
+    const blocks = 5;
+    const addBlocks = Math.max(stats.added > 0 ? 1 : 0, Math.round((stats.added / total) * blocks));
+    const rmBlocks = Math.max(stats.removed > 0 ? 1 : 0, Math.round((stats.removed / total) * blocks));
+    const modBlocks = Math.max(stats.modified > 0 ? 1 : 0, blocks - addBlocks - rmBlocks);
+    let html = '';
+    for (let i = 0; i < addBlocks; i++) html += '<span class="gh-stat-block gh-block-add"></span>';
+    for (let i = 0; i < rmBlocks; i++) html += '<span class="gh-stat-block gh-block-rm"></span>';
+    for (let i = 0; i < modBlocks; i++) html += '<span class="gh-stat-block gh-block-mod"></span>';
+    return html;
+  }
+
+  _ghNavigate(dir) {
+    const positions = this._ghChangePositions || [];
+    if (positions.length === 0) return;
+
+    // Remove previous highlight
+    if (this._ghCurrentIndex >= 0) {
+      const prev = document.getElementById(positions[this._ghCurrentIndex]);
+      if (prev) prev.classList.remove('gh-highlight');
+    }
+
+    this._ghCurrentIndex += dir;
+    if (this._ghCurrentIndex < 0) this._ghCurrentIndex = positions.length - 1;
+    if (this._ghCurrentIndex >= positions.length) this._ghCurrentIndex = 0;
+
+    const el = document.getElementById(positions[this._ghCurrentIndex]);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('gh-highlight');
+    }
+
+    const navCount = document.getElementById('ghNavCount');
+    if (navCount) navCount.textContent = `${this._ghCurrentIndex + 1}/${positions.length}`;
+  }
+
+  // ===== PDF: Visual Pixel-Level Diff Comparison =====
+  async _renderPdfVisualDiff(container, prev1, prev2, v1, v2) {
+    if (!window.pdfjsLib) {
+      container.innerHTML = '<div class="doc-empty"><p>PDF.js chua duoc tai. Kiem tra ket noi mang.</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="pdf-diff-wrapper">
+        <div class="pdf-diff-toolbar">
+          <div class="pdf-diff-modes">
+            <button class="pdf-mode-btn active" data-mode="sidebyside" onclick="docCompare._switchPdfMode(this, 'sidebyside')">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/></svg>
+              Song song
+            </button>
+            <button class="pdf-mode-btn" data-mode="diff" onclick="docCompare._switchPdfMode(this, 'diff')">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/></svg>
+              Phan biet
+            </button>
+            <button class="pdf-mode-btn" data-mode="slider" onclick="docCompare._switchPdfMode(this, 'slider')">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
+              Truot
+            </button>
+          </div>
+          <div class="pdf-diff-legend" id="pdfDiffLegend" style="display:none;">
+            <span class="gh-legend-item gh-legend-del">Xoa</span>
+            <span class="gh-legend-item gh-legend-ins">Them</span>
+            <span class="gh-legend-item" style="color:var(--doc-text-sub);background:var(--doc-bg-surface-hover);">Khong doi</span>
+          </div>
+          <div id="pdfDiffStatus" style="font-size:12px;color:var(--doc-text-sub);"></div>
+        </div>
+        <div class="pdf-diff-body" id="pdfDiffBody">
+          <div style="display:flex;justify-content:center;align-items:center;height:200px;gap:8px;color:var(--doc-text-sub);">
+            <div class="doc-loading-spinner" style="padding:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>
+            Dang render PDF...
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      // Load both PDFs
+      const [pdf1, pdf2] = await Promise.all([
+        pdfjsLib.getDocument(prev1.url).promise,
+        pdfjsLib.getDocument(prev2.url).promise
+      ]);
+
+      const maxPages = Math.max(pdf1.numPages, pdf2.numPages);
+      const body = document.getElementById('pdfDiffBody');
+      const RENDER_WIDTH = 500; // width per page for comparison
+
+      // Store page canvases for mode switching
+      this._pdfDiffPages = [];
+
+      body.innerHTML = '';
+
+      for (let p = 1; p <= maxPages; p++) {
+        // Render both pages to off-screen canvases
+        const canvas1 = document.createElement('canvas');
+        const canvas2 = document.createElement('canvas');
+        let w = RENDER_WIDTH, h1 = 0, h2 = 0;
+
+        if (p <= pdf1.numPages) {
+          const page = await pdf1.getPage(p);
+          const vp = page.getViewport({ scale: 1 });
+          const scale = RENDER_WIDTH / vp.width;
+          const viewport = page.getViewport({ scale });
+          canvas1.width = viewport.width;
+          canvas1.height = viewport.height;
+          h1 = viewport.height;
+          await page.render({ canvasContext: canvas1.getContext('2d'), viewport }).promise;
+        }
+
+        if (p <= pdf2.numPages) {
+          const page = await pdf2.getPage(p);
+          const vp = page.getViewport({ scale: 1 });
+          const scale = RENDER_WIDTH / vp.width;
+          const viewport = page.getViewport({ scale });
+          canvas2.width = viewport.width;
+          canvas2.height = viewport.height;
+          h2 = viewport.height;
+          await page.render({ canvasContext: canvas2.getContext('2d'), viewport }).promise;
+        }
+
+        // Compute pixel diff
+        const maxH = Math.max(h1, h2) || 600;
+        const diffCanvas = document.createElement('canvas');
+        diffCanvas.width = w;
+        diffCanvas.height = maxH;
+        const diffCtx = diffCanvas.getContext('2d');
+
+        let diffPercent = 0;
+        const hasPage1 = p <= pdf1.numPages;
+        const hasPage2 = p <= pdf2.numPages;
+
+        if (hasPage1 && hasPage2) {
+          // Both pages exist — pixel compare
+          const ctx1 = canvas1.getContext('2d');
+          const ctx2 = canvas2.getContext('2d');
+          const minH = Math.min(h1, h2);
+          const data1 = ctx1.getImageData(0, 0, w, minH);
+          const data2 = ctx2.getImageData(0, 0, w, minH);
+          const diffData = diffCtx.createImageData(w, maxH);
+          const px1 = data1.data, px2 = data2.data, out = diffData.data;
+
+          let totalPixels = w * maxH;
+          let diffPixels = 0;
+
+          // Compare pixel by pixel with BLOCK tolerance
+          const THRESHOLD = 30; // color difference threshold
+
+          for (let y = 0; y < maxH; y++) {
+            for (let x = 0; x < w; x++) {
+              const idx = (y * w + x) * 4;
+
+              if (y >= minH) {
+                // Extra rows — only in taller version
+                if (y < h1) {
+                  // Only in v1 (deleted)
+                  out[idx] = 255; out[idx + 1] = 80; out[idx + 2] = 80; out[idx + 3] = 200;
+                  diffPixels++;
+                } else if (y < h2) {
+                  // Only in v2 (added)
+                  out[idx] = 80; out[idx + 1] = 200; out[idx + 2] = 80; out[idx + 3] = 200;
+                  diffPixels++;
+                } else {
+                  out[idx + 3] = 0;
+                }
+                continue;
+              }
+
+              const r1 = px1[idx], g1 = px1[idx + 1], b1 = px1[idx + 2];
+              const r2 = px2[idx], g2 = px2[idx + 1], b2 = px2[idx + 2];
+              const dr = Math.abs(r1 - r2), dg = Math.abs(g1 - g2), db = Math.abs(b1 - b2);
+              const diff = dr + dg + db;
+
+              if (diff > THRESHOLD) {
+                // Different pixel
+                diffPixels++;
+                // Show old as red, new as green blend
+                if (r1 + g1 + b1 > r2 + g2 + b2) {
+                  // Darker in new (content removed/changed)
+                  out[idx] = 255; out[idx + 1] = 60; out[idx + 2] = 60; out[idx + 3] = 180;
+                } else {
+                  // Brighter in new (content added/changed)
+                  out[idx] = 60; out[idx + 1] = 200; out[idx + 2] = 60; out[idx + 3] = 180;
+                }
+              } else {
+                // Same pixel — show faded
+                const grey = Math.round((r2 + g2 + b2) / 3);
+                out[idx] = grey; out[idx + 1] = grey; out[idx + 2] = grey; out[idx + 3] = 60;
+              }
+            }
+          }
+
+          diffCtx.putImageData(diffData, 0, 0);
+          diffPercent = totalPixels > 0 ? Math.round((diffPixels / totalPixels) * 100) : 0;
+        } else if (hasPage1 && !hasPage2) {
+          // Page only in v1 (deleted)
+          diffCtx.fillStyle = 'rgba(255, 80, 80, 0.3)';
+          diffCtx.fillRect(0, 0, w, h1);
+          diffCtx.drawImage(canvas1, 0, 0);
+          diffCtx.fillStyle = 'rgba(255, 80, 80, 0.4)';
+          diffCtx.fillRect(0, 0, w, h1);
+          diffPercent = 100;
+        } else if (!hasPage1 && hasPage2) {
+          // Page only in v2 (added)
+          diffCtx.fillStyle = 'rgba(80, 200, 80, 0.3)';
+          diffCtx.fillRect(0, 0, w, h2);
+          diffCtx.drawImage(canvas2, 0, 0);
+          diffCtx.fillStyle = 'rgba(80, 200, 80, 0.4)';
+          diffCtx.fillRect(0, 0, w, h2);
+          diffPercent = 100;
+        }
+
+        this._pdfDiffPages.push({
+          pageNum: p,
+          canvas1, canvas2, diffCanvas,
+          w, h1, h2, maxH,
+          diffPercent,
+          hasPage1, hasPage2
+        });
+      }
+
+      // Store versions for labels
+      this._pdfDiffV1 = v1;
+      this._pdfDiffV2 = v2;
+
+      // Render default mode (side by side)
+      this._renderPdfMode('sidebyside');
+
+      // Update status
+      const totalDiff = this._pdfDiffPages.reduce((sum, p) => sum + p.diffPercent, 0);
+      const avgDiff = Math.round(totalDiff / this._pdfDiffPages.length);
+      document.getElementById('pdfDiffStatus').textContent =
+        `${maxPages} trang | Khac biet trung binh: ${avgDiff}%`;
+
+    } catch (err) {
+      console.error('PDF diff error:', err);
+      container.querySelector('#pdfDiffBody').innerHTML =
+        `<div class="doc-empty" style="color:var(--doc-danger);"><p>Khong the so sanh PDF: ${err.message}</p></div>`;
+    }
+  }
+
+  _switchPdfMode(btn, mode) {
+    btn.closest('.pdf-diff-modes').querySelectorAll('.pdf-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const legend = document.getElementById('pdfDiffLegend');
+    if (legend) legend.style.display = mode === 'diff' ? 'flex' : 'none';
+    this._renderPdfMode(mode);
+  }
+
+  _renderPdfMode(mode) {
+    const body = document.getElementById('pdfDiffBody');
+    if (!body || !this._pdfDiffPages) return;
+    body.innerHTML = '';
+
+    const v1 = this._pdfDiffV1;
+    const v2 = this._pdfDiffV2;
+
+    for (const page of this._pdfDiffPages) {
+      const section = document.createElement('div');
+      section.className = 'pdf-page-section';
+
+      // Page header
+      const header = document.createElement('div');
+      header.className = 'pdf-page-header';
+      const diffColor = page.diffPercent > 10 ? 'var(--doc-danger)' : page.diffPercent > 0 ? 'var(--doc-warning)' : 'var(--doc-success)';
+      header.innerHTML = `
+        <span>Trang ${page.pageNum}</span>
+        <span style="color:${diffColor};font-weight:600;">${page.diffPercent}% khac biet</span>
+      `;
+      section.appendChild(header);
+
+      if (mode === 'sidebyside') {
+        const row = document.createElement('div');
+        row.className = 'pdf-side-row';
+
+        // Left (v1)
+        const leftDiv = document.createElement('div');
+        leftDiv.className = 'pdf-side-panel';
+        if (page.hasPage1) {
+          const img1 = document.createElement('img');
+          img1.src = page.canvas1.toDataURL();
+          img1.style.cssText = 'width:100%;display:block;border-radius:4px;';
+          leftDiv.appendChild(img1);
+        } else {
+          leftDiv.innerHTML = '<div class="pdf-no-page">Khong co trang nay</div>';
+        }
+
+        // Right (v2)
+        const rightDiv = document.createElement('div');
+        rightDiv.className = 'pdf-side-panel';
+        if (page.hasPage2) {
+          const img2 = document.createElement('img');
+          img2.src = page.canvas2.toDataURL();
+          img2.style.cssText = 'width:100%;display:block;border-radius:4px;';
+          rightDiv.appendChild(img2);
+        } else {
+          rightDiv.innerHTML = '<div class="pdf-no-page">Khong co trang nay</div>';
+        }
+
+        row.appendChild(leftDiv);
+        row.appendChild(rightDiv);
+        section.appendChild(row);
+
+      } else if (mode === 'diff') {
+        // Show diff overlay full width
+        const diffDiv = document.createElement('div');
+        diffDiv.className = 'pdf-diff-panel';
+        const img = document.createElement('img');
+        img.src = page.diffCanvas.toDataURL();
+        img.style.cssText = 'width:100%;max-width:600px;display:block;margin:0 auto;border-radius:4px;border:1px solid var(--doc-border);';
+        diffDiv.appendChild(img);
+        section.appendChild(diffDiv);
+
+      } else if (mode === 'slider') {
+        // Slider mode: overlap v1 and v2, drag to reveal
+        const sliderWrap = document.createElement('div');
+        sliderWrap.className = 'pdf-slider-wrap';
+        sliderWrap.style.cssText = `position:relative;max-width:500px;margin:0 auto;overflow:hidden;border-radius:4px;border:1px solid var(--doc-border);aspect-ratio:${page.w}/${page.maxH};`;
+
+        const imgOld = document.createElement('img');
+        imgOld.src = page.canvas1.toDataURL();
+        imgOld.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;';
+        imgOld.draggable = false;
+
+        const clipDiv = document.createElement('div');
+        clipDiv.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;';
+        const imgNew = document.createElement('img');
+        imgNew.src = page.canvas2.toDataURL();
+        imgNew.style.cssText = `position:absolute;top:0;right:0;width:${page.w}px;height:100%;max-width:none;object-fit:contain;`;
+        imgNew.draggable = false;
+        clipDiv.appendChild(imgNew);
+
+        const handle = document.createElement('div');
+        handle.className = 'pdf-slider-handle';
+        handle.style.cssText = 'position:absolute;top:0;left:50%;width:3px;height:100%;background:var(--doc-primary);cursor:ew-resize;z-index:10;';
+
+        const handleGrip = document.createElement('div');
+        handleGrip.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:var(--doc-primary);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+        handleGrip.innerHTML = '<svg width="14" height="14" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2"><path d="M8 4l-4 4 4 4M16 4l4 4-4 4"/></svg>';
+        handle.appendChild(handleGrip);
+
+        // Labels
+        const labelOld = document.createElement('div');
+        labelOld.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);color:white;padding:2px 8px;border-radius:4px;font-size:11px;z-index:5;';
+        labelOld.textContent = `v${v1} cu`;
+
+        const labelNew = document.createElement('div');
+        labelNew.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);color:white;padding:2px 8px;border-radius:4px;font-size:11px;z-index:5;';
+        labelNew.textContent = `v${v2} moi`;
+
+        sliderWrap.appendChild(imgOld);
+        sliderWrap.appendChild(clipDiv);
+        sliderWrap.appendChild(handle);
+        sliderWrap.appendChild(labelOld);
+        sliderWrap.appendChild(labelNew);
+        section.appendChild(sliderWrap);
+
+        // Slider interaction
+        let dragging = false;
+        const onMove = (e) => {
+          if (!dragging) return;
+          const rect = sliderWrap.getBoundingClientRect();
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          let x = clientX - rect.left;
+          x = Math.max(0, Math.min(rect.width, x));
+          const pct = (x / rect.width) * 100;
+          handle.style.left = pct + '%';
+          clipDiv.style.width = (100 - pct) + '%';
+          imgNew.style.width = sliderWrap.offsetWidth + 'px';
+        };
+        handle.addEventListener('mousedown', (e) => { dragging = true; e.preventDefault(); });
+        handle.addEventListener('touchstart', (e) => { dragging = true; e.preventDefault(); });
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove);
+        document.addEventListener('mouseup', () => { dragging = false; });
+        document.addEventListener('touchend', () => { dragging = false; });
+      }
+
+      body.appendChild(section);
+    }
+  }
+
+
+
+  _buildAndRenderExcelDiff(container, prev1, prev2, v1, v2) {
+    const allSheets = [...new Set([...(prev1.sheetNames || []), ...(prev2.sheetNames || [])])];
+    const sheets = {};
+
+    allSheets.forEach(name => {
+      const rows1 = (prev1.sheets && prev1.sheets[name]) || [];
+      const rows2 = (prev2.sheets && prev2.sheets[name]) || [];
+
+      const maxRows = Math.max(rows1.length, rows2.length);
+      const maxCols = Math.max(
+        rows1.reduce((m, r) => Math.max(m, r.length), 0),
+        rows2.reduce((m, r) => Math.max(m, r.length), 0)
+      );
+
+      const changeMap = [];
+      let stats = { added: 0, removed: 0, modified: 0 };
+
+      for (let r = 0; r < maxRows; r++) {
+        const rowChanges = [];
+        const r1 = rows1[r] || [];
+        const r2 = rows2[r] || [];
+        let rowHasAdd = false, rowHasRemove = false, rowHasModify = false;
+
+        for (let c = 0; c < maxCols; c++) {
+          const val1 = r1[c] != null ? String(r1[c]) : '';
+          const val2 = r2[c] != null ? String(r2[c]) : '';
+          if (val1 === val2) {
+            rowChanges.push(null);
+          } else if (val1 === '' && val2 !== '') {
+            rowChanges.push('add'); rowHasAdd = true;
+          } else if (val1 !== '' && val2 === '') {
+            rowChanges.push('remove'); rowHasRemove = true;
+          } else {
+            rowChanges.push('modify'); rowHasModify = true;
+          }
+        }
+        changeMap.push(rowChanges);
+
+        // Count stats per ROW (not per cell) for meaningful numbers
+        if (r >= rows1.length) { stats.added++; }           // Entire row is new
+        else if (r >= rows2.length) { stats.removed++; }    // Entire row was removed
+        else if (rowHasModify || rowHasAdd || rowHasRemove) { stats.modified++; }  // Row has changes
+      }
+
+      const isOnlyInV1 = !(prev2.sheets && prev2.sheets[name]);
+      const isOnlyInV2 = !(prev1.sheets && prev1.sheets[name]);
+
+      sheets[name] = { rows1, rows2, maxCols, changeMap, stats, isOnlyInV1, isOnlyInV2 };
+    });
+
+    this._visualSheets = sheets;
+    this._visualRes = { v1: { version: v1 }, v2: { version: v2 }, sheetNames: allSheets };
+
+    // Compute total stats
+    let totalAdd = 0, totalRemove = 0, totalModify = 0;
+    allSheets.forEach(name => {
+      const s = sheets[name].stats;
+      totalAdd += s.added;
+      totalRemove += s.removed;
+      totalModify += s.modified;
+    });
+
+    container.innerHTML = `
+      <div class="visual-compare-wrapper">
+        <div class="visual-compare-summary">
+          <div class="diff-stat-card stat-added">
+            <div class="stat-icon">+</div>
+            <div><div class="diff-stat-number">${totalAdd}</div><div style="font-size:0.7rem;font-weight:400;">Them moi</div></div>
+          </div>
+          <div class="diff-stat-card stat-removed">
+            <div class="stat-icon">-</div>
+            <div><div class="diff-stat-number">${totalRemove}</div><div style="font-size:0.7rem;font-weight:400;">Xoa bo</div></div>
+          </div>
+          <div class="diff-stat-card stat-modified">
+            <div class="stat-icon">~</div>
+            <div><div class="diff-stat-number">${totalModify}</div><div style="font-size:0.7rem;font-weight:400;">Thay doi</div></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:12px;align-items:center;">
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-add"></div><span style="font-size:11px;">Them moi</span></div>
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-remove"></div><span style="font-size:11px;">Xoa bo</span></div>
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-modify"></div><span style="font-size:11px;">Sua doi</span></div>
+          </div>
+        </div>
+        <div class="visual-compare-tabs" id="visualCompareTabs">
+          ${allSheets.map((name, i) => {
+      const s = sheets[name].stats;
+      const changes = s.added + s.removed + s.modified;
+      return `<button class="visual-compare-tab ${i === 0 ? 'active' : ''}" onclick="docCompare.switchVisualSheet('${name.replace(/'/g, "\\\\'")}')">${this.escapeHtml(name)}${changes > 0 ? `<span class="sheet-badge has-changes">${changes}</span>` : ''}</button>`;
+    }).join('')}
+        </div>
+        <div class="visual-compare-body" id="visualCompareBody"></div>
+      </div>
+    `;
+
+    this.switchVisualSheet(allSheets[0]);
+  }
+
+  switchVisualSheet(sheetName) {
+    const tabs = document.querySelectorAll('.visual-compare-tab');
+    tabs.forEach(t => t.classList.toggle('active', t.textContent.trim().startsWith(sheetName)));
+
+    const body = document.getElementById('visualCompareBody');
+    const sheet = this._visualSheets[sheetName];
+    const res = this._visualRes;
+    if (!sheet) { body.innerHTML = '<div class="doc-empty"><p>Sheet khong co du lieu</p></div>'; return; }
+
+    const colLetter = (i) => { let s = ''; i++; while (i > 0) { i--; s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26); } return s; };
+
+    const buildTable = (rows, side) => {
+      if (!rows || rows.length === 0) return '<div class="doc-empty" style="padding:2rem;font-size:12px;color:var(--doc-text-muted);">Khong co du lieu</div>';
+
+      let headerHtml = '<tr><th class="row-num"></th>';
+      for (let c = 0; c < sheet.maxCols; c++) headerHtml += `<th>${colLetter(c)}</th>`;
+      headerHtml += '</tr>';
+
+      let bodyHtml = '';
+      const maxRows = Math.max(sheet.rows1.length, sheet.rows2.length);
+      for (let r = 0; r < maxRows; r++) {
+        const row = rows[r] || [];
+        bodyHtml += `<tr><td class="row-num">${r + 1}</td>`;
+        for (let c = 0; c < sheet.maxCols; c++) {
+          const val = row[c] != null ? this.escapeHtml(String(row[c])) : '';
+          const change = sheet.changeMap[r] ? sheet.changeMap[r][c] : null;
+          let cls = '';
+          if (change === 'add' && side === 'right') cls = 'cell-add';
+          else if (change === 'remove' && side === 'left') cls = 'cell-remove';
+          else if (change === 'modify') cls = 'cell-modify';
+          bodyHtml += `<td class="${cls}" ${val ? `title="${val}"` : ''}>${val}</td>`;
+        }
+        bodyHtml += '</tr>';
+      }
+      return `<table class="visual-excel-table"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+    };
+
+    body.innerHTML = `
+      <div class="visual-compare-side" id="visualSideLeft">
+        <div class="visual-compare-side-header">
+          <span class="doc-version-tl-tag" style="background:var(--doc-text-muted);">v${res.v1.version}</span> Phien ban cu
+          ${sheet.isOnlyInV1 ? '<span style="color:var(--doc-danger);font-size:11px;margin-left:auto;">Chi co o phien ban nay</span>' : ''}
+        </div>
+        ${buildTable(sheet.rows1, 'left')}
+      </div>
+      <div class="visual-compare-side" id="visualSideRight">
+        <div class="visual-compare-side-header">
+          <span class="doc-version-tl-tag latest">v${res.v2.version}</span> Phien ban moi
+          ${sheet.isOnlyInV2 ? '<span style="color:var(--doc-success);font-size:11px;margin-left:auto;">Sheet moi</span>' : ''}
+        </div>
+        ${buildTable(sheet.rows2, 'right')}
+      </div>
+    `;
+
+    // Sync scroll
+    const left = document.getElementById('visualSideLeft');
+    const right = document.getElementById('visualSideRight');
+    let syncing = false;
+    const syncScroll = (src, tgt) => { if (syncing) return; syncing = true; tgt.scrollTop = src.scrollTop; tgt.scrollLeft = src.scrollLeft; syncing = false; };
+    left.addEventListener('scroll', () => syncScroll(left, right));
+    right.addEventListener('scroll', () => syncScroll(right, left));
+  }
+
+  _renderVisualWordDiff(container, prev1, prev2, v1, v2) {
+    container.innerHTML = `
+      <div class="visual-compare-wrapper">
+        <div class="visual-compare-summary">
+          <div style="font-size:13px;color:var(--doc-text-sub);">So sanh truc quan noi dung Word — cuon 2 ben de xem thay doi</div>
+          <div style="margin-left:auto;display:flex;gap:12px;align-items:center;">
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-add"></div><span style="font-size:11px;">Phien ban moi</span></div>
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-remove"></div><span style="font-size:11px;">Phien ban cu</span></div>
+          </div>
+        </div>
+        <div class="visual-compare-body">
+          <div class="visual-compare-side" id="visualSideLeft">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag" style="background:var(--doc-text-muted);">v${v1}</span> Phien ban cu
+            </div>
+            <div class="visual-word-panel">${prev1.content || ''}</div>
+          </div>
+          <div class="visual-compare-side" id="visualSideRight">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag latest">v${v2}</span> Phien ban moi
+            </div>
+            <div class="visual-word-panel">${prev2.content || ''}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const left = document.getElementById('visualSideLeft');
+    const right = document.getElementById('visualSideRight');
+    let syncing = false;
+    const syncScroll = (src, tgt) => { if (syncing) return; syncing = true; tgt.scrollTop = src.scrollTop; syncing = false; };
+    left.addEventListener('scroll', () => syncScroll(left, right));
+    right.addEventListener('scroll', () => syncScroll(right, left));
+  }
+
+  _renderVisualPdfDiff(container, prev1, prev2, v1, v2) {
+    container.innerHTML = `
+      <div class="visual-compare-wrapper">
+        <div class="visual-compare-summary">
+          <div style="font-size:13px;color:var(--doc-text-sub);">So sanh truc quan PDF — xem 2 phien ban song song</div>
+        </div>
+        <div class="visual-compare-body" style="height:calc(100vh - 220px);">
+          <div class="visual-compare-side" id="pdfSideLeft" style="overflow-y:auto;">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag" style="background:var(--doc-text-muted);">v${v1}</span> Phien ban cu
+              <span id="pdfPageCountLeft" style="margin-left:auto;font-size:11px;color:var(--doc-text-sub);"></span>
+            </div>
+            <div id="pdfPagesLeft" style="padding:8px;display:flex;flex-direction:column;align-items:center;gap:8px;"></div>
+          </div>
+          <div class="visual-compare-side" id="pdfSideRight" style="overflow-y:auto;">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag latest">v${v2}</span> Phien ban moi
+              <span id="pdfPageCountRight" style="margin-left:auto;font-size:11px;color:var(--doc-text-sub);"></span>
+            </div>
+            <div id="pdfPagesRight" style="padding:8px;display:flex;flex-direction:column;align-items:center;gap:8px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Render both PDFs using pdf.js
+    const self = this;
+    const renderSide = async (url, containerId, countId) => {
+      const pagesEl = document.getElementById(containerId);
+      const countEl = document.getElementById(countId);
+      if (!pagesEl) return;
+
+      if (!window.pdfjsLib) {
+        pagesEl.innerHTML = '<div class="doc-empty"><p>PDF.js chua duoc tai. Kiem tra ket noi mang.</p></div>';
+        return;
+      }
+
+      try {
+        const loadingTask = pdfjsLib.getDocument(url);
+        const pdf = await loadingTask.promise;
+        if (countEl) countEl.textContent = `${pdf.numPages} trang`;
+
+        const sideEl = pagesEl.parentElement;
+        const sideWidth = sideEl ? sideEl.clientWidth - 40 : 400;
+
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const unscaledVp = page.getViewport({ scale: 1 });
+          const scale = sideWidth / unscaledVp.width;
+          const viewport = page.getViewport({ scale });
+
+          const wrapper = document.createElement('div');
+          wrapper.style.cssText = 'position:relative;background:#fff;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.2);';
+
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.cssText = 'display:block;width:100%;height:auto;';
+
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          // Page number label
+          const label = document.createElement('div');
+          label.style.cssText = 'text-align:center;font-size:10px;color:var(--doc-text-sub);padding:2px 0;';
+          label.textContent = `Trang ${p} / ${pdf.numPages}`;
+
+          wrapper.appendChild(canvas);
+          pagesEl.appendChild(wrapper);
+          pagesEl.appendChild(label);
+        }
+      } catch (err) {
+        console.error('PDF render error:', err);
+        pagesEl.innerHTML = `<div class="doc-empty" style="color:var(--doc-danger);"><p>Khong the hien thi PDF: ${err.message}</p></div>`;
+      }
+    };
+
+    // Render both sides in parallel
+    Promise.all([
+      renderSide(prev1.url, 'pdfPagesLeft', 'pdfPageCountLeft'),
+      renderSide(prev2.url, 'pdfPagesRight', 'pdfPageCountRight')
+    ]).then(() => {
+      // Setup synchronized scrolling
+      const left = document.getElementById('pdfSideLeft');
+      const right = document.getElementById('pdfSideRight');
+      if (!left || !right) return;
+
+      let syncing = false;
+      const syncScroll = (src, tgt) => {
+        if (syncing) return;
+        syncing = true;
+        tgt.scrollTop = src.scrollTop;
+        syncing = false;
+      };
+      left.addEventListener('scroll', () => syncScroll(left, right));
+      right.addEventListener('scroll', () => syncScroll(right, left));
+    });
+  }
+
+  _renderVisualTextDiff(container, prev1, prev2, v1, v2) {
+    const lines1 = (prev1.content || '').split('\n');
+    const lines2 = (prev2.content || '').split('\n');
+    const maxLines = Math.max(lines1.length, lines2.length);
+
+    // Build line-level diff
+    let stats = { added: 0, removed: 0, modified: 0 };
+    const lineChanges = [];
+    for (let i = 0; i < maxLines; i++) {
+      const l1 = i < lines1.length ? lines1[i] : null;
+      const l2 = i < lines2.length ? lines2[i] : null;
+      if (l1 === l2) { lineChanges.push(null); }
+      else if (l1 === null) { lineChanges.push('add'); stats.added++; }
+      else if (l2 === null) { lineChanges.push('remove'); stats.removed++; }
+      else { lineChanges.push('modify'); stats.modified++; }
+    }
+
+    const buildPanel = (lines, side) => {
+      return lines.map((line, i) => {
+        const change = lineChanges[i];
+        let cls = '';
+        if (change === 'add' && side === 'right') cls = 'cell-add';
+        else if (change === 'remove' && side === 'left') cls = 'cell-remove';
+        else if (change === 'modify') cls = 'cell-modify';
+        return `<div class="visual-text-line ${cls}"><span class="visual-text-num">${i + 1}</span><span class="visual-text-content">${this.escapeHtml(line)}</span></div>`;
+      }).join('');
+    };
+
+    // Pad shorter array
+    while (lines1.length < maxLines) lines1.push('');
+    while (lines2.length < maxLines) lines2.push('');
+
+    container.innerHTML = `
+      <div class="visual-compare-wrapper">
+        <div class="visual-compare-summary">
+          <div class="diff-stat-card stat-added">
+            <div class="stat-icon">+</div>
+            <div><div class="diff-stat-number">${stats.added}</div><div style="font-size:0.7rem;font-weight:400;">Them moi</div></div>
+          </div>
+          <div class="diff-stat-card stat-removed">
+            <div class="stat-icon">-</div>
+            <div><div class="diff-stat-number">${stats.removed}</div><div style="font-size:0.7rem;font-weight:400;">Xoa bo</div></div>
+          </div>
+          <div class="diff-stat-card stat-modified">
+            <div class="stat-icon">~</div>
+            <div><div class="diff-stat-number">${stats.modified}</div><div style="font-size:0.7rem;font-weight:400;">Thay doi</div></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:12px;align-items:center;">
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-add"></div><span style="font-size:11px;">Them moi</span></div>
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-remove"></div><span style="font-size:11px;">Xoa bo</span></div>
+            <div class="diff-legend-item"><div class="diff-legend-swatch swatch-modify"></div><span style="font-size:11px;">Sua doi</span></div>
+          </div>
+        </div>
+        <div class="visual-compare-body">
+          <div class="visual-compare-side" id="visualSideLeft">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag" style="background:var(--doc-text-muted);">v${v1}</span> Phien ban cu
+            </div>
+            <div class="visual-text-panel">${buildPanel(lines1, 'left')}</div>
+          </div>
+          <div class="visual-compare-side" id="visualSideRight">
+            <div class="visual-compare-side-header">
+              <span class="doc-version-tl-tag latest">v${v2}</span> Phien ban moi
+            </div>
+            <div class="visual-text-panel">${buildPanel(lines2, 'right')}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const left = document.getElementById('visualSideLeft');
+    const right = document.getElementById('visualSideRight');
+    let syncing = false;
+    const syncScroll = (src, tgt) => { if (syncing) return; syncing = true; tgt.scrollTop = src.scrollTop; syncing = false; };
+    left.addEventListener('scroll', () => syncScroll(left, right));
+    right.addEventListener('scroll', () => syncScroll(right, left));
   }
 
   async executeCompare(force = false) {
@@ -1538,7 +2580,7 @@ class DocumentCompare {
             ${hiddenCount} dong khong thay doi (nhan de mo)
           </span>
         `;
-        collapseDiv.onclick = function() {
+        collapseDiv.onclick = function () {
           const lines = JSON.parse(this.getAttribute('data-hidden-lines'));
           let startLine = parseInt(this.getAttribute('data-start-line'));
           const expandFrag = document.createDocumentFragment();
@@ -1678,12 +2720,52 @@ class DocumentCompare {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffDays === 0) {
-      return `Hom nay ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+      return `Hom nay ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
     if (diffDays === 1) return 'Hom qua';
     if (diffDays < 7) return `${diffDays} ngay truoc`;
 
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  timeAgo(dateString) {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - d;
+    const seconds = Math.floor(diffMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+
+    if (seconds < 60) return 'just now';
+    if (minutes < 60) return `uploaded ${minutes}m ago`;
+    if (hours < 24) return `uploaded ${hours}h ago`;
+    if (days < 7) return `uploaded ${days}d ago`;
+    if (weeks < 5) return `uploaded ${weeks}w ago`;
+    return `uploaded ${months}mo ago`;
+  }
+
+  formatDateShort(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const year = d.getFullYear();
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    return `${year}-${month}`;
+  }
+
+  filterVersions(query) {
+    if (!this.currentDocument) return;
+    const timeline = document.getElementById('docVersionTimeline');
+    if (!timeline) return;
+    const items = timeline.querySelectorAll('.doc-version-tl-item');
+    const q = (query || '').toLowerCase().trim();
+    items.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
   }
 
   formatSize(bytes) {
@@ -1721,6 +2803,83 @@ class DocumentCompare {
 
   dragStart(event, docId) {
     event.dataTransfer.setData('text/plain', docId);
+  }
+  showPrompt(message, defaultValue, onConfirm) {
+    // Remove existing prompt modal
+    document.querySelectorAll('.doc-prompt-overlay').forEach(el => el.remove());
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doc-prompt-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+
+    overlay.innerHTML = `
+      <div style="background:var(--bg-secondary, #1a1a2e);border:1px solid var(--border-color, rgba(255,255,255,0.1));border-radius:8px;padding:20px 24px;min-width:320px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <p style="margin:0 0 12px 0;font-size:14px;color:var(--text-primary, #fff);">${message}</p>
+        <input type="text" id="docPromptInput" value="${this.escapeHtml(defaultValue || '')}" 
+          style="width:100%;padding:8px 12px;border:1px solid var(--border-color, rgba(255,255,255,0.15));border-radius:6px;background:var(--bg-primary, #0f0f1a);color:var(--text-primary, #fff);font-size:14px;outline:none;box-sizing:border-box;" />
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button id="docPromptCancel" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border-color, rgba(255,255,255,0.15));background:transparent;color:var(--text-secondary, #aaa);cursor:pointer;font-size:13px;">Huy</button>
+          <button id="docPromptOk" style="padding:6px 16px;border-radius:6px;border:none;background:var(--accent-primary, #667eea);color:#fff;cursor:pointer;font-size:13px;font-weight:600;">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector('#docPromptInput');
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+
+    const close = () => overlay.remove();
+
+    overlay.querySelector('#docPromptCancel').addEventListener('click', close);
+    overlay.querySelector('#docPromptOk').addEventListener('click', () => {
+      const val = input.value;
+      close();
+      if (typeof onConfirm === 'function') onConfirm(val);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const val = input.value;
+        close();
+        if (typeof onConfirm === 'function') onConfirm(val);
+      } else if (e.key === 'Escape') {
+        close();
+      }
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+  }
+
+  showCustomConfirm(message, onConfirm) {
+    document.querySelectorAll('.doc-prompt-overlay').forEach(el => el.remove());
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doc-prompt-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+
+    overlay.innerHTML = `
+      <div style="background:var(--bg-secondary, #1a1a2e);border:1px solid var(--border-color, rgba(255,255,255,0.1));border-radius:8px;padding:20px 24px;min-width:300px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <p style="margin:0 0 16px 0;font-size:14px;color:var(--text-primary, #fff);">${message}</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button id="docConfirmCancel" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border-color, rgba(255,255,255,0.15));background:transparent;color:var(--text-secondary, #aaa);cursor:pointer;font-size:13px;">Huy</button>
+          <button id="docConfirmOk" style="padding:6px 16px;border-radius:6px;border:none;background:var(--danger, #f44);color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Xac nhan</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+
+    overlay.querySelector('#docConfirmCancel').addEventListener('click', close);
+    overlay.querySelector('#docConfirmOk').addEventListener('click', () => {
+      close();
+      if (typeof onConfirm === 'function') onConfirm();
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
   }
 }
 

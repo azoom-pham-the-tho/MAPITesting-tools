@@ -20,11 +20,36 @@ const Preview = {
     container.innerHTML = `
       <div class="workspace-preview">
         <div class="preview-header">
-          <span class="preview-title">🖥️ UI Preview</span>
-          ${options.transitions && options.transitions.length > 0 ? `<span class="preview-hint" style="font-size: 10px; color: var(--accent-primary); margin-left: 10px;">⚡ Có ${options.transitions.length} tương tác chuyển màn</span>` : ''}
+          ${options.transitions && options.transitions.length > 0 ? `<span class="preview-hint" style="font-size: 10px; color: var(--accent-primary);">⚡ Có ${options.transitions.length} tương tác chuyển màn</span>` : '<span></span>'}
           <div class="preview-actions">
-            <button class="btn btn-xs btn-secondary" id="preview-fullscreen">⛶ Fullscreen</button>
-            <button class="btn btn-xs btn-secondary" id="preview-new-tab">↗ Mở tab mới</button>
+            <button class="btn btn-xs btn-secondary" id="preview-fullscreen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+              Fullscreen
+            </button>
+            <button class="btn btn-xs btn-secondary" id="preview-new-tab">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              Mở tab mới
+            </button>
+            <button class="btn btn-xs btn-secondary" id="preview-add-comment" title="Click rồi chọn vị trí trên preview để thêm comment">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="8" x2="12" y2="14"/>
+                <line x1="9" y1="11" x2="15" y2="11"/>
+              </svg>
+              Thêm
+            </button>
+            <button class="btn btn-xs btn-secondary" id="preview-show-comments" title="Hiện/ẩn tất cả comments">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              Comments <span class="comment-count-badge" id="commentCountBadge">0</span>
+            </button>
           </div>
         </div>
         <iframe id="preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
@@ -142,10 +167,10 @@ const Preview = {
             // Recursive search in shadow roots
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
             while (walker.nextNode()) {
-                const node = walker.currentNode;
-                if (node.shadowRoot) {
-                    results = results.concat(deepQuerySelectorAll(node.shadowRoot, selector));
-                }
+              const node = walker.currentNode;
+              if (node.shadowRoot) {
+                results = results.concat(deepQuerySelectorAll(node.shadowRoot, selector));
+              }
             }
             return results;
           };
@@ -153,44 +178,44 @@ const Preview = {
           options.transitions.forEach(edge => {
             const selector = edge.interaction?.selector;
             const simpleSelector = edge.interaction?.simpleSelector;
-            
+
             // Try both selectors for robustness
             const targets = [selector, simpleSelector].filter(s => s);
-            
+
             targets.forEach(sel => {
-                try {
-                  const elements = deepQuerySelectorAll(doc, sel);
-                  elements.forEach(el => {
-                    // Avoid double binding
-                    if (el.dataset.flowBound) return;
-                    el.dataset.flowBound = 'true';
+              try {
+                const elements = deepQuerySelectorAll(doc, sel);
+                elements.forEach(el => {
+                  // Avoid double binding
+                  if (el.dataset.flowBound) return;
+                  el.dataset.flowBound = 'true';
 
-                    el.classList.add('flow-interactive');
-                    el.title = `Đi đến: ${edge.to}`; // Browser tooltip
+                  el.classList.add('flow-interactive');
+                  el.title = `Đi đến: ${edge.to}`; // Browser tooltip
 
-                    el.addEventListener('mouseenter', (e) => {
-                      tooltip.textContent = `⚡ Next: ${edge.to.split(/[\\/]/).pop()}`;
-                      tooltip.style.display = 'block';
-                      const rect = el.getBoundingClientRect();
-                      tooltip.style.left = `${rect.left}px`;
-                      tooltip.style.top = `${rect.top - 25}px`;
-                    });
-
-                    el.addEventListener('mouseleave', () => {
-                      tooltip.style.display = 'none';
-                    });
-
-                    el.addEventListener('click', (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (options.onTransition) {
-                        options.onTransition(edge.to);
-                      }
-                    });
+                  el.addEventListener('mouseenter', (e) => {
+                    tooltip.textContent = `⚡ Next: ${edge.to.split(/[\\/]/).pop()}`;
+                    tooltip.style.display = 'block';
+                    const rect = el.getBoundingClientRect();
+                    tooltip.style.left = `${rect.left}px`;
+                    tooltip.style.top = `${rect.top - 25}px`;
                   });
-                } catch (err) {
-                  // console.warn('Failed to apply selector:', sel);
-                }
+
+                  el.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                  });
+
+                  el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (options.onTransition) {
+                      options.onTransition(edge.to);
+                    }
+                  });
+                });
+              } catch (err) {
+                // console.warn('Failed to apply selector:', sel);
+              }
             });
           });
         }
@@ -214,6 +239,26 @@ const Preview = {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     });
+
+    // Add Comment handler - activates pin placement mode
+    const addCommentBtn = container.querySelector('#preview-add-comment');
+    if (addCommentBtn) {
+      addCommentBtn.addEventListener('click', () => {
+        if (window.CommentUI && typeof window.CommentUI.activatePinMode === 'function') {
+          window.CommentUI.activatePinMode();
+        }
+      });
+    }
+
+    // Show Comments handler - toggles all comment pins visibility
+    const showCommentsBtn = container.querySelector('#preview-show-comments');
+    if (showCommentsBtn) {
+      showCommentsBtn.addEventListener('click', () => {
+        if (window.CommentUI && typeof window.CommentUI.togglePins === 'function') {
+          window.CommentUI.togglePins();
+        }
+      });
+    }
   },
 
   /**

@@ -15,7 +15,7 @@ const state = {
   selectedItem: null,
   captureStatus: "idle",
   captureInterval: null,
-  activeTab: "sitemap",
+  activeTab: "dashboard",
 };
 
 // Global view state for Sitemap canvas
@@ -429,9 +429,9 @@ function setupTabs() {
     dashboard: "dashboardTab",
     sitemap: "sitemapTab",
     preview: "previewTab",
-    documents: "documentsTab",
     compare: "compareTab",
-    api: "apiTab",
+    documents: "documentsTab",
+    testing: "testingTab",
   };
 
   // Known display modes per tab
@@ -456,7 +456,7 @@ function setupTabs() {
       if (el) el.style.display = "none";
     });
 
-    // Also hide dynamically-added tab contents (testrunner, reports, etc.)
+    // Also hide dynamically-added tab contents (legacy support)
     document.querySelectorAll(".tab-content[id]").forEach((el) => {
       el.style.display = "none";
     });
@@ -492,16 +492,78 @@ function setupTabs() {
       }
     }
 
-    // Load test runner when switching to testrunner tab
-    if (tabName === "testrunner" && window.TestRunnerUI) {
-      TestRunnerUI.loadHistory();
-      TestRunnerUI.loadStatistics();
+    // Load testing data when switching to testing tab
+    if (tabName === "testing") {
+      if (window.TestRunnerUI) {
+        TestRunnerUI.loadHistory();
+        TestRunnerUI.loadStatistics();
+      }
+      if (window.ReportUI) {
+        ReportUI.loadReports();
+      }
     }
+  });
 
-    // Load reports when switching to reports tab
-    if (tabName === "reports" && window.ReportUI) {
-      ReportUI.loadReports();
-    }
+  // ---- Inner sub-tab handling (Compare, Testing) ----
+  setupInnerSubtabs();
+}
+
+// Handle inner sub-tab switching for Compare and Testing tabs
+function setupInnerSubtabs() {
+  document.querySelectorAll('.inner-subtabs').forEach(container => {
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('.subtab-btn');
+      if (!btn) return;
+
+      const subtab = btn.dataset.subtab;
+      if (!subtab) return;
+
+      // Update active button within this container
+      container.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Toggle content within the parent tab
+      const parentTab = container.closest('.tab-content');
+      if (parentTab) {
+        parentTab.querySelectorAll('.subtab-content').forEach(c => {
+          c.classList.remove('active');
+          c.style.display = 'none';
+        });
+
+        // Find the matching subtab-content
+        const contentMap = {
+          // Compare sub-tabs
+          'ui': 'compareUIContent',
+          'api': 'compareAPIContent',
+          // Testing sub-tabs
+          'api-tester': 'apiTesterContent',
+          'runner': 'testRunnerContent',
+          'reports': 'reportsContent',
+        };
+
+        const contentId = contentMap[subtab];
+        const content = contentId && document.getElementById(contentId);
+        if (content) {
+          content.classList.add('active');
+          content.style.display = 'block';
+        }
+
+        // Load data for specific sub-tabs
+        if (subtab === 'api-tester' && window.ApiTester && ApiTester._needsRefresh) {
+          ApiTester._needsRefresh = false;
+          if (typeof ApiTester.populateCapturedApis === 'function') {
+            ApiTester.populateCapturedApis();
+          }
+        }
+        if (subtab === 'runner' && window.TestRunnerUI) {
+          TestRunnerUI.loadHistory();
+          TestRunnerUI.loadStatistics();
+        }
+        if (subtab === 'reports' && window.ReportUI) {
+          ReportUI.loadReports();
+        }
+      }
+    });
   });
 }
 
@@ -686,16 +748,24 @@ async function selectProject(projectName) {
       CompareView.populateSections(state.sections);
     }
 
-    // Auto-switch to Sitemap View
-    const sitemapTabBtn = document.querySelector(
-      '.tab-btn[data-tab="sitemap"]',
+    // Defer API Tester loading — only load when user opens API tab
+    // (saves network + autoLogin overhead on project selection)
+    if (window.ApiTester) {
+      ApiTester._needsRefresh = true;
+    }
+
+    // Auto-switch to Dashboard View
+    const dashboardTabBtn = document.querySelector(
+      '.tab-btn[data-tab="dashboard"]',
     );
-    if (sitemapTabBtn) {
-      // If already active, manually trigger load, otherwise click triggers it
-      if (sitemapTabBtn.classList.contains("active")) {
-        loadSitemapWorkspace();
+    if (dashboardTabBtn) {
+      if (dashboardTabBtn.classList.contains("active")) {
+        // Already on dashboard, just load data
+        if (window.DashboardFeatures) {
+          DashboardFeatures.analytics.loadDashboard();
+        }
       } else {
-        sitemapTabBtn.click();
+        dashboardTabBtn.click();
       }
     }
   } catch (error) {
@@ -1969,9 +2039,15 @@ function setupPanelToggles() {
   const leftPanel = document.getElementById('leftPanel');
   const collapseBtn = document.getElementById('toggleLeftPanelBtn');
   const expandBtn = document.getElementById('expandLeftPanelBtn');
+  let savedWidth = null;
 
   if (collapseBtn && leftPanel) {
     collapseBtn.addEventListener('click', () => {
+      // Save current width before collapsing (in case user resized)
+      savedWidth = leftPanel.style.width || null;
+      // Clear inline width/minWidth set by drag-resize so CSS .collapsed can work
+      leftPanel.style.width = '';
+      leftPanel.style.minWidth = '';
       leftPanel.classList.add('collapsed');
     });
   }
@@ -1979,6 +2055,11 @@ function setupPanelToggles() {
   if (expandBtn && leftPanel) {
     expandBtn.addEventListener('click', () => {
       leftPanel.classList.remove('collapsed');
+      // Restore previously saved width from drag-resize
+      if (savedWidth) {
+        leftPanel.style.width = savedWidth;
+        leftPanel.style.minWidth = savedWidth;
+      }
     });
   }
 }

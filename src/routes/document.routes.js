@@ -50,17 +50,20 @@ router.post('/:project/upload', upload.single('file'), async (req, res, next) =>
 
         // Fix Vietnamese filename encoding (Multer default is latin1)
         const originalname = decodeFileName(req.file.originalname);
+        // Optional: force add version to an existing document
+        const targetDocId = req.query.docId || null;
 
         const result = await documentService.upload(
             req.params.project,
             req.file.path,
-            originalname
+            originalname,
+            targetDocId
         );
         // Clean up temp file
-        await fs.remove(req.file.path).catch(() => {});
+        await fs.remove(req.file.path).catch(() => { });
         res.json({ success: true, ...result });
     } catch (error) {
-        if (req.file) await fs.remove(req.file.path).catch(() => {});
+        if (req.file) await fs.remove(req.file.path).catch(() => { });
         next(error);
     }
 });
@@ -99,6 +102,73 @@ router.put('/:project/:docId/category', async (req, res, next) => {
     }
 });
 
+// Rename document (set display name)
+router.put('/:project/:docId/rename', async (req, res, next) => {
+    try {
+        const { displayName } = req.body;
+        if (!displayName) {
+            return res.status(400).json({ error: 'displayName required' });
+        }
+        const result = await documentService.renameDocument(req.params.project, req.params.docId, displayName);
+        res.json({ success: true, document: result });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Compare two versions (visual mode - structured data)
+// MUST be before /:version routes to avoid "compare-visual" matching as :version
+router.get('/:project/:docId/compare-visual', async (req, res, next) => {
+    try {
+        const { v1, v2 } = req.query;
+        if (!v1 || !v2) {
+            return res.status(400).json({ error: 'v1 and v2 query params required' });
+        }
+        const result = await documentService.compareVisual(
+            req.params.project, req.params.docId,
+            parseInt(v1), parseInt(v2)
+        );
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GitHub-style text diff (works for all file types: text, word, pdf)
+router.get('/:project/:docId/compare-text-diff', async (req, res, next) => {
+    try {
+        const { v1, v2 } = req.query;
+        if (!v1 || !v2) {
+            return res.status(400).json({ error: 'v1 and v2 query params required' });
+        }
+        const result = await documentService.compareTextDiff(
+            req.params.project, req.params.docId,
+            parseInt(v1), parseInt(v2)
+        );
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Compare two versions (text diff mode)
+router.get('/:project/:docId/compare', async (req, res, next) => {
+    try {
+        const { v1, v2, force } = req.query;
+        if (!v1 || !v2) {
+            return res.status(400).json({ error: 'v1 and v2 query params required' });
+        }
+        const result = await documentService.compareVersions(
+            req.params.project, req.params.docId,
+            parseInt(v1), parseInt(v2),
+            force === 'true'
+        );
+        res.json({ success: true, ...result });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Download version
 router.get('/:project/:docId/:version/download', async (req, res, next) => {
     try {
@@ -106,9 +176,7 @@ router.get('/:project/:docId/:version/download', async (req, res, next) => {
         const { filePath, fileName } = await documentService.getFilePath(
             req.params.project, req.params.docId, version
         );
-        // Encode Vietnamese filename for Content-Disposition header (RFC 5987)
         const encodedName = encodeURIComponent(fileName).replace(/'/g, '%27');
-        // ASCII fallback: replace non-ASCII chars with underscore
         const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_');
         res.setHeader('Content-Disposition', `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedName}`);
         res.sendFile(path.resolve(filePath));
@@ -150,24 +218,6 @@ router.get('/:project/:docId/:version/excel-rows', async (req, res, next) => {
         const rows = allRows.slice(start, start + count);
 
         res.json({ success: true, rows, hasMore: start + count < allRows.length, total: allRows.length });
-    } catch (error) {
-        next(error);
-    }
-});
-
-// Compare two versions
-router.get('/:project/:docId/compare', async (req, res, next) => {
-    try {
-        const { v1, v2, force } = req.query;
-        if (!v1 || !v2) {
-            return res.status(400).json({ error: 'v1 and v2 query params required' });
-        }
-        const result = await documentService.compareVersions(
-            req.params.project, req.params.docId,
-            parseInt(v1), parseInt(v2),
-            force === 'true' // Convert string to boolean
-        );
-        res.json({ success: true, ...result });
     } catch (error) {
         next(error);
     }

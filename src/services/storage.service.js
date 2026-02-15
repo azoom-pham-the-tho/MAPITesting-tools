@@ -34,6 +34,7 @@
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
+const { pathExistsCached, batchWrite, writeJsonFast, invalidatePathCacheDir, batchPathExists } = require('../utils/file-io-optimizer');
 
 /**
  * Get storage directory path
@@ -232,7 +233,32 @@ class StorageService {
                     for (const node of flowData.nodes) {
                         // Use nestedPath if available (new format), otherwise flat (old format)
                         const relativePath = node.nestedPath || node.id;
-                        const screenDir = path.join(mainPath, relativePath);
+                        let screenDir = path.join(mainPath, relativePath);
+
+                        // If directory doesn't exist in main, search sections for fallback
+                        if (!await fs.pathExists(screenDir)) {
+                            const sectionsPath = this.getSectionsPath(projectName);
+                            if (await fs.pathExists(sectionsPath)) {
+                                const sectionFolders = await fs.readdir(sectionsPath, { withFileTypes: true });
+                                // Sort descending to check latest sections first
+                                const sorted = sectionFolders
+                                    .filter(d => d.isDirectory())
+                                    .map(d => d.name)
+                                    .sort()
+                                    .reverse();
+                                for (const sf of sorted) {
+                                    const candidate = path.join(sectionsPath, sf, relativePath);
+                                    if (await fs.pathExists(candidate)) {
+                                        screenDir = candidate;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Check if this screen has actual captured data
+                        const hasUI = node.type !== 'start' && await fs.pathExists(path.join(screenDir, 'screen.html'));
+                        const hasAPI = node.type !== 'start' && await fs.pathExists(path.join(screenDir, 'apis.json'));
 
                         const treeNode = {
                             id: node.id,
@@ -241,6 +267,8 @@ class StorageService {
                             nodeType: node.type || 'page',
                             path: screenDir,
                             urlPath: node.path || '',
+                            hasUI,
+                            hasAPI,
                             children: []
                         };
                         nodeMap.set(node.id, treeNode);
@@ -481,20 +509,19 @@ class StorageService {
         return { timestamp, path: sectionPath };
     }
 
-    // Delete a section
     async deleteSection(projectName, sectionTimestamp) {
         const sectionPath = this.getSectionPath(projectName, sectionTimestamp);
-        if (!await fs.pathExists(sectionPath)) {
+        if (!await pathExistsCached(sectionPath)) {
             throw new Error(`Section "${sectionTimestamp}" does not exist`);
         }
         await fs.remove(sectionPath);
+        invalidatePathCacheDir(sectionPath);
         return { deleted: sectionTimestamp };
     }
 
-    // Get section details (screens and APIs)
     async getSectionDetails(projectName, sectionTimestamp) {
         const sectionPath = this.getSectionPath(projectName, sectionTimestamp);
-        if (!await fs.pathExists(sectionPath)) {
+        if (!await pathExistsCached(sectionPath)) {
             throw new Error(`Section "${sectionTimestamp}" does not exist`);
         }
 
@@ -504,7 +531,7 @@ class StorageService {
         // Read flow.json to get screen list
         const flowPath = path.join(sectionPath, 'flow.json');
         let flowData = null;
-        if (await fs.pathExists(flowPath)) {
+        if (await pathExistsCached(flowPath)) {
             try {
                 flowData = await fs.readJson(flowPath);
             } catch (e) {
@@ -519,28 +546,28 @@ class StorageService {
 
                 const relativePath = node.nestedPath || node.id;
                 const screenPath = path.join(sectionPath, relativePath);
-                if (!await fs.pathExists(screenPath)) continue;
+                if (!await pathExistsCached(screenPath)) continue;
 
-                // Load screen metadata (new: meta.json, old: screen.json)
-                let metadata = {};
-                let metaPath = path.join(screenPath, 'meta.json');
-                if (!await fs.pathExists(metaPath)) {
-                    metaPath = path.join(screenPath, 'screen.json');
-                }
-                if (await fs.pathExists(metaPath)) {
-                    try {
-                        metadata = await fs.readJson(metaPath);
-                    } catch (e) { }
-                }
-
-                // Check for preview (screen.html for rendering)
+                // Batch check all possible files for this screen
+                const metaJsonPath = path.join(screenPath, 'meta.json');
+                const screenJsonPath = path.join(screenPath, 'screen.json');
                 const previewPath = path.join(screenPath, 'screen.html');
-                const hasPreview = await fs.pathExists(previewPath);
+                const apisPath = path.join(screenPath, 'apis.json');
+                const actionsPath = path.join(screenPath, 'actions.json');
+                const existsMap = await batchPathExists([metaJsonPath, screenJsonPath, previewPath, apisPath, actionsPath]);
+
+                // Load screen metadata
+                let metadata = {};
+                const metaPath = existsMap.get(metaJsonPath) ? metaJsonPath : (existsMap.get(screenJsonPath) ? screenJsonPath : null);
+                if (metaPath) {
+                    try { metadata = await fs.readJson(metaPath); } catch (e) { }
+                }
+
+                const hasPreview = existsMap.get(previewPath);
 
                 // Load API requests
                 let apis = [];
-                const apisPath = path.join(screenPath, 'apis.json');
-                if (await fs.pathExists(apisPath)) {
+                if (existsMap.get(apisPath)) {
                     try {
                         const apisData = await fs.readJson(apisPath);
                         apis = (apisData || []).map(r => ({
@@ -554,8 +581,7 @@ class StorageService {
 
                 // Load actions
                 let actionsCount = 0;
-                const actionsPath = path.join(screenPath, 'actions.json');
-                if (await fs.pathExists(actionsPath)) {
+                if (existsMap.get(actionsPath)) {
                     try {
                         const actionsData = await fs.readJson(actionsPath);
                         actionsCount = (actionsData || []).length;
@@ -1003,42 +1029,49 @@ class StorageService {
         return { path: apiPath };
     }
 
-    // Save data to section
     async saveToSection(projectName, sectionTimestamp, urlPath, data) {
         const sectionPath = this.getSectionPath(projectName, sectionTimestamp);
         const pagePath = path.join(sectionPath, this.urlToPath(urlPath));
         let uiPath = null;
 
-        // Save UI data
+        const writes = [];
+
+        // Prepare UI data
         if (data.ui) {
             uiPath = path.join(pagePath, 'UI');
             await fs.ensureDir(uiPath);
-            await fs.writeJson(path.join(uiPath, 'snapshot.json'), data.ui.snapshot, { spaces: 2 });
+            writes.push({ path: path.join(uiPath, 'snapshot.json'), data: data.ui.snapshot, options: { spaces: 2 } });
             if (data.ui.styles) {
-                await fs.writeFile(path.join(uiPath, 'styles.css'), data.ui.styles);
+                writes.push({ path: path.join(uiPath, 'styles.css'), data: data.ui.styles });
             }
         }
 
-        // Save API data
+        // Prepare API data
         if (data.api && data.api.length > 0) {
             const apiPath = path.join(pagePath, 'API');
             await fs.ensureDir(apiPath);
-            await fs.writeJson(path.join(apiPath, 'requests.json'), data.api, { spaces: 2 });
+            writes.push({ path: path.join(apiPath, 'requests.json'), data: data.api, options: { spaces: 2 } });
         }
 
-        // Save metadata
-        const metaPath = path.join(pagePath, 'metadata.json');
-        await fs.writeJson(metaPath, {
-            url: data.url,
-            fullUrl: data.fullUrl,
-            captureId: data.captureId,
-            capturedAt: data.capturedAt,
-            type: data.type,
-            activeTab: data.activeTab,
-            breadcrumb: data.breadcrumb,
-            apiCount: data.api ? data.api.length : 0,
-            modalCount: data.modals ? data.modals.length : 0
-        }, { spaces: 2 });
+        // Prepare metadata
+        writes.push({
+            path: path.join(pagePath, 'metadata.json'),
+            data: {
+                url: data.url,
+                fullUrl: data.fullUrl,
+                captureId: data.captureId,
+                capturedAt: data.capturedAt,
+                type: data.type,
+                activeTab: data.activeTab,
+                breadcrumb: data.breadcrumb,
+                apiCount: data.api ? data.api.length : 0,
+                modalCount: data.modals ? data.modals.length : 0
+            },
+            options: { spaces: 2 }
+        });
+
+        // Write all files in parallel
+        await batchWrite(writes);
 
         return { path: pagePath, uiPath: uiPath };
     }
@@ -1049,93 +1082,97 @@ class StorageService {
         const pagePath = path.join(sectionPath, fullPath);
         let uiPath = null;
 
-        // Save UI data
+        const writes = [];
+
+        // Prepare UI data
         if (data.ui) {
             uiPath = path.join(pagePath, 'UI');
             await fs.ensureDir(uiPath);
-            await fs.writeJson(path.join(uiPath, 'snapshot.json'), data.ui.snapshot, { spaces: 2 });
+            writes.push({ path: path.join(uiPath, 'snapshot.json'), data: data.ui.snapshot, options: { spaces: 2 } });
             if (data.ui.styles) {
-                await fs.writeFile(path.join(uiPath, 'styles.css'), data.ui.styles);
+                writes.push({ path: path.join(uiPath, 'styles.css'), data: data.ui.styles });
             }
         }
 
-        // Save API data
+        // Prepare API data
         if (data.api && data.api.length > 0) {
             const apiPath = path.join(pagePath, 'API');
             await fs.ensureDir(apiPath);
-            await fs.writeJson(path.join(apiPath, 'requests.json'), data.api, { spaces: 2 });
+            writes.push({ path: path.join(apiPath, 'requests.json'), data: data.api, options: { spaces: 2 } });
         }
 
-        // Save modals separately
+        // Prepare modals
         if (data.modals && data.modals.length > 0) {
             for (let i = 0; i < data.modals.length; i++) {
                 const modal = data.modals[i];
                 const modalPath = path.join(pagePath, 'modals', `modal_${i + 1}`);
                 await fs.ensureDir(modalPath);
-                await fs.writeJson(path.join(modalPath, 'modal.json'), {
-                    title: modal.title,
-                    selector: modal.selector,
-                    html: modal.html
-                }, { spaces: 2 });
+                writes.push({
+                    path: path.join(modalPath, 'modal.json'),
+                    data: { title: modal.title, selector: modal.selector, html: modal.html },
+                    options: { spaces: 2 }
+                });
             }
         }
 
-        // Save metadata
-        const metaPath = path.join(pagePath, 'metadata.json');
-        await fs.writeJson(metaPath, {
-            url: data.url,
-            fullUrl: data.fullUrl,
-            captureId: data.captureId,
-            capturedAt: data.capturedAt,
-            type: data.type,
-            activeTab: data.activeTab,
-            breadcrumb: data.breadcrumb,
-            apiCount: data.api ? data.api.length : 0,
-            modalCount: data.modals ? data.modals.length : 0
-        }, { spaces: 2 });
+        // Prepare metadata
+        writes.push({
+            path: path.join(pagePath, 'metadata.json'),
+            data: {
+                url: data.url, fullUrl: data.fullUrl,
+                captureId: data.captureId, capturedAt: data.capturedAt,
+                type: data.type, activeTab: data.activeTab,
+                breadcrumb: data.breadcrumb,
+                apiCount: data.api ? data.api.length : 0,
+                modalCount: data.modals ? data.modals.length : 0
+            },
+            options: { spaces: 2 }
+        });
+
+        // Write all files in parallel
+        await batchWrite(writes);
 
         console.log(`   💾 Saved to: ${fullPath}`);
 
         return { path: pagePath, uiPath: uiPath };
     }
 
-    // Load UI snapshot
+    // Load UI snapshot (optimized with batch pathExists)
     async loadUISnapshot(snapshotPath) {
-        // Support both old and new formats
         const snapshotFile = path.join(snapshotPath, 'snapshot.json');
         const stylesFile = path.join(snapshotPath, 'styles.css');
-
-        // New format files
         const screenHtmlFile = path.join(snapshotPath, 'screen.html');
         const domJsonFile = path.join(snapshotPath, 'dom.json');
         const metaFile = path.join(snapshotPath, 'meta.json');
 
+        // Check all paths in parallel (5 checks → 1 round-trip)
+        const existsMap = await batchPathExists([snapshotFile, stylesFile, screenHtmlFile, domJsonFile, metaFile]);
+
         const result = { snapshot: null, styles: null };
 
         // Try old format first (snapshot.json + styles.css)
-        if (await fs.pathExists(snapshotFile)) {
+        if (existsMap.get(snapshotFile)) {
             result.snapshot = await fs.readJson(snapshotFile);
         }
 
-        if (await fs.pathExists(stylesFile)) {
+        if (existsMap.get(stylesFile)) {
             result.styles = await fs.readFile(stylesFile, 'utf-8');
         }
 
         // If old format not found, try new format (screen.html + dom.json)
-        if (!result.snapshot && await fs.pathExists(screenHtmlFile)) {
+        if (!result.snapshot && existsMap.get(screenHtmlFile)) {
             const html = await fs.readFile(screenHtmlFile, 'utf-8');
             let domTree = null;
             let metadata = {};
 
-            if (await fs.pathExists(domJsonFile)) {
+            if (existsMap.get(domJsonFile)) {
                 domTree = await fs.readJson(domJsonFile);
             }
 
-            if (await fs.pathExists(metaFile)) {
+            if (existsMap.get(metaFile)) {
                 metadata = await fs.readJson(metaFile);
             }
 
-            // Convert new format to old format structure for compatibility
             result.snapshot = {
                 html,
                 dom: domTree,
@@ -1144,8 +1181,7 @@ class StorageService {
                 viewport: metadata.viewport || { width: 1920, height: 1080 }
             };
 
-            // Styles are embedded in screen.html for new format
-            result.styles = ''; // Empty styles, HTML already contains embedded styles
+            result.styles = '';
         }
 
         return result;

@@ -7,6 +7,8 @@ const enhancedDomDiffer = require('../utils/enhanced-dom-differ');
 
 const advancedTextDiffer = require('../utils/advanced-text-differ');
 const colorParser = require('../utils/color-parser');
+const tieredDiff = require('../utils/tiered-diff-engine');
+const comparisonConfig = require('../config/comparison-config');
 
 class CompareService {
 
@@ -418,6 +420,21 @@ class CompareService {
         const html2 = snapshot2.html || '';
 
         // ═══════════════════════════════════════
+        // LAYER 0: Hash check — skip if HTML identical
+        // ═══════════════════════════════════════
+        if (!tieredDiff.htmlHashCheck(html1, html2)) {
+            return {
+                hasChanges: false,
+                summary: 'Không thay đổi',
+                domDiff: { totalChanges: 0, added: 0, removed: 0, modified: 0, lines: [], categories: {}, highlights: [], summary: 'Không thay đổi' },
+                categories: {},
+                similarity: '100.00',
+                cssDiff: null,
+                skippedByHash: true
+            };
+        }
+
+        // ═══════════════════════════════════════
         // LEVEL 1: DOM Elements Comparison
         // ═══════════════════════════════════════
         const elements1 = this.extractDOMElements(html1);
@@ -817,7 +834,7 @@ class CompareService {
                 });
             } else {
                 // Both have this endpoint — compare deeply
-                const changes = this.compareEndpointAPIs(apis1, apis2, endpoint);
+                const changes = await this.compareEndpointAPIs(apis1, apis2, endpoint);
                 if (changes.length > 0) {
                     modified.push({
                         endpoint,
@@ -848,11 +865,16 @@ class CompareService {
 
     /**
      * Deep compare API calls for the same endpoint between two sections
+     * Uses tiered diff engine: hash check → worker thread → fallback sync
      */
-    compareEndpointAPIs(apis1, apis2, endpoint) {
-        const changes = [];
+    async compareEndpointAPIs(apis1, apis2, endpoint) {
+        // Tiered: try hash + worker first
+        const useWorker = comparisonConfig.advanced?.enableWorkers !== false;
+        const tieredResult = await tieredDiff.compareEndpointAPIs(apis1, apis2, endpoint, { useWorker });
+        if (tieredResult !== null) return tieredResult;
 
-        // Compare each pair (by index)
+        // Fallback: sync comparison on main thread
+        const changes = [];
         const maxLen = Math.max(apis1.length, apis2.length);
         for (let i = 0; i < maxLen; i++) {
             const api1 = apis1[i];
@@ -866,7 +888,6 @@ class CompareService {
                 continue;
             }
 
-            // Status change
             if (api1.status !== api2.status) {
                 changes.push({
                     type: 'status_changed',
@@ -876,22 +897,14 @@ class CompareService {
                 });
             }
 
-            // Response body change (deep compare for JSON)
-            const bodyDiff = this.compareResponseBodies(api1.responseBody, api2.responseBody);
+            const bodyDiff = await this.compareResponseBodies(api1.responseBody, api2.responseBody);
             if (bodyDiff) {
-                changes.push({
-                    type: 'response_changed',
-                    ...bodyDiff
-                });
+                changes.push({ type: 'response_changed', ...bodyDiff });
             }
 
-            // Request body change
-            const reqDiff = this.compareResponseBodies(api1.requestBody, api2.requestBody);
+            const reqDiff = await this.compareResponseBodies(api1.requestBody, api2.requestBody);
             if (reqDiff) {
-                changes.push({
-                    type: 'request_changed',
-                    ...reqDiff
-                });
+                changes.push({ type: 'request_changed', ...reqDiff });
             }
         }
 
@@ -900,32 +913,11 @@ class CompareService {
 
     /**
      * Compare two response bodies (handles JSON objects, arrays, and strings)
+     * Uses tiered engine: hash check to skip identical bodies
      */
-    compareResponseBodies(body1, body2) {
-        if (body1 === body2) return null;
-        if (body1 === null && body2 === null) return null;
-        if (body1 === null || body2 === null) {
-            return { detail: body1 === null ? 'Response body added' : 'Response body removed' };
-        }
-
-        // Both are objects — do structural comparison
-        if (typeof body1 === 'object' && typeof body2 === 'object') {
-            const diffs = this.diffObjects(body1, body2, '', 0);
-            if (diffs.length === 0) return null;
-            return {
-                detail: `${diffs.length} field(s) changed`,
-                fields: diffs.slice(0, 20) // Limit to 20 most important diffs
-            };
-        }
-
-        // String comparison
-        const str1 = String(body1);
-        const str2 = String(body2);
-        if (str1 === str2) return null;
-        if (str1.length !== str2.length) {
-            return { detail: `Body size: ${str1.length} → ${str2.length} chars` };
-        }
-        return { detail: 'Body content changed' };
+    async compareResponseBodies(body1, body2) {
+        const useWorker = comparisonConfig.advanced?.enableWorkers !== false;
+        return tieredDiff.compareResponseBodies(body1, body2, { useWorker });
     }
 
     /**

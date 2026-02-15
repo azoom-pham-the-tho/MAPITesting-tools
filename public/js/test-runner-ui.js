@@ -590,59 +590,23 @@ const TestRunnerUI = {
   },
 
   // ---------------------------------------------------------------------------
-  //  Tab Setup
+  //  Tab Setup (integrated into Testing tab)
   // ---------------------------------------------------------------------------
   _addTab() {
-    const tabList = document.querySelector('.workspace-tabs');
-    if (!tabList) return;
-
-    // Check if already added
-    if (tabList.querySelector('[data-tab="testrunner"]')) return;
-
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn';
-    btn.setAttribute('data-tab', 'testrunner');
-    btn.setAttribute('role', 'tab');
-    btn.setAttribute('aria-selected', 'false');
-    btn.innerHTML = this.icons.testRunner + 'Test Runner';
-
-    // Insert after Dashboard tab
-    const dashBtn = tabList.querySelector('[data-tab="dashboard"]');
-    if (dashBtn && dashBtn.nextSibling) {
-      tabList.insertBefore(btn, dashBtn.nextSibling);
-    } else {
-      tabList.appendChild(btn);
-    }
-
-    btn.addEventListener('click', () => {
-      this._activateTab();
-    });
+    // Testing tab is now static in HTML, no need to create a tab button.
+    // Just ensure the content area exists.
   },
 
   _activateTab() {
-    // Deactivate all tabs
-    document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.remove('active');
-      b.setAttribute('aria-selected', 'false');
-    });
-    document.querySelectorAll('.tab-content').forEach(c => {
-      c.classList.remove('active');
-      c.style.display = 'none';
-    });
+    // Activate the Testing parent tab
+    const testingBtn = document.querySelector('.tab-btn[data-tab="testing"]');
+    if (testingBtn) testingBtn.click();
 
-    // Activate test runner tab
-    const btn = document.querySelector('.tab-btn[data-tab="testrunner"]');
-    if (btn) {
-      btn.classList.add('active');
-      btn.setAttribute('aria-selected', 'true');
-    }
-    const tab = document.getElementById('testRunnerTab');
-    if (tab) {
-      tab.classList.add('active');
-      tab.style.display = '';
-    }
+    // Activate the Runner sub-tab
+    const runnerSubBtn = document.querySelector('#testingSubtabs .subtab-btn[data-subtab="runner"]');
+    if (runnerSubBtn) runnerSubBtn.click();
 
-    if (state) state.activeTab = 'testrunner';
+    if (state) state.activeTab = 'testing';
 
     // Load data
     this.renderTab();
@@ -654,25 +618,15 @@ const TestRunnerUI = {
   //  Tab Content Creation
   // ---------------------------------------------------------------------------
   _createTabContent() {
-    if (document.getElementById('testRunnerTab')) return;
-
-    const panelContent = document.querySelector('.panel-center .panel-content') ||
-                         document.querySelector('section.panel-center .panel-content');
-    if (!panelContent) return;
-
-    const div = document.createElement('div');
-    div.id = 'testRunnerTab';
-    div.className = 'tab-content';
-    div.setAttribute('role', 'tabpanel');
-    div.style.display = 'none';
-    panelContent.appendChild(div);
+    // Content renders into #testRunnerContent inside the Testing tab (static HTML).
+    // No need to create a new tab content div.
   },
 
   // ---------------------------------------------------------------------------
   //  Render Full Tab
   // ---------------------------------------------------------------------------
   renderTab() {
-    const tab = document.getElementById('testRunnerTab');
+    const tab = document.getElementById('testRunnerContent');
     if (!tab) return;
 
     const stats = this.statistics || {};
@@ -696,8 +650,8 @@ const TestRunnerUI = {
             <button class="btn btn-primary btn-sm" id="trRunAllBtn" ${this.isRunning ? 'disabled' : ''}>
               ${this.isRunning ? this.icons.running : this.icons.play}
               ${this.isRunning
-                ? 'Running (' + this.runProgress.current + '/' + this.runProgress.total + ')...'
-                : 'Run All Tests'}
+        ? 'Running (' + this.runProgress.current + '/' + this.runProgress.total + ')...'
+        : 'Run All Tests'}
             </button>
           </div>
         </div>
@@ -895,8 +849,8 @@ const TestRunnerUI = {
       this._updateSectionBadge(sectionTimestamp, passed ? 'pass' : 'fail', result);
 
       // Refresh history if tab is active
-      if (document.getElementById('testRunnerTab') &&
-          document.getElementById('testRunnerTab').classList.contains('active')) {
+      if (document.getElementById('testRunnerContent') &&
+        document.getElementById('testRunnerContent').classList.contains('active')) {
         this.loadStatistics();
         this.loadHistory(1);
       }
@@ -1484,7 +1438,7 @@ const TestRunnerUI = {
         this.currentPage = 1;
 
         // Refresh if tab is active
-        const tab = document.getElementById('testRunnerTab');
+        const tab = document.getElementById('testRunnerContent');
         if (tab && tab.classList.contains('active')) {
           this.renderTab();
           this.loadStatistics();

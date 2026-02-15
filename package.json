@@ -113,7 +113,7 @@
     "fs-extra": "^11.2.0",
     "mammoth": "^1.11.0",
     "multer": "^2.0.2",
-    "pdf2json": "^4.0.2",
+    "pdf-parse": "^1.1.1",
     "playwright-core": "^1.40.0",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"

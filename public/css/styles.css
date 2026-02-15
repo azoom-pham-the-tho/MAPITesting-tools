@@ -302,6 +302,7 @@ body {
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sidebar-tab {
@@ -1057,15 +1058,21 @@ body {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-glass) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--accent-primary) !important;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-glass);
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
+  background: rgba(102, 126, 234, 0.15) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 12px rgba(102, 126, 234, 0.4) !important;
+}
+
+@keyframes annotationPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; transform: scale(1.05); }
 }
 
 .btn-danger {
@@ -2887,18 +2894,7 @@ body {
   gap: 6px;
 }
 
-.version-item {
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-glass);
-  transition: all 0.15s;
-}
-
-.version-item:hover {
-  border-color: var(--accent-primary);
-  background: rgba(102, 126, 234, 0.06);
-}
+/* version-item styles moved to version-ui.js */
 
 .version-item-header {
   display: flex;

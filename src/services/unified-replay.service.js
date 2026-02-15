@@ -212,53 +212,142 @@ class UnifiedReplayService {
 
     /**
      * Setup API mocking from captured data
+     * Improved: Multi-tier matching (method + pathname + body hash) + fallback logging + external blocking
      */
     async setupAPIMocking(screensData) {
-        // Collect all APIs from all screens
-        const allAPIs = [];
+        const crypto = require('crypto');
+
+        // Build a structured mock index for fast lookup
+        const mockIndex = new Map(); // pathname → [{ method, bodyHash, api, screenId }]
+        let totalMocks = 0;
+
         for (const [screenId, data] of Object.entries(screensData)) {
             for (const api of data.apis) {
-                allAPIs.push({
-                    ...api,
-                    screenId
-                });
+                try {
+                    const url = new URL(api.url);
+                    const pathname = url.pathname;
+                    const bodyHash = api.requestBody
+                        ? crypto.createHash('md5').update(JSON.stringify(api.requestBody)).digest('hex')
+                        : null;
+
+                    if (!mockIndex.has(pathname)) {
+                        mockIndex.set(pathname, []);
+                    }
+                    mockIndex.get(pathname).push({
+                        method: api.method,
+                        bodyHash,
+                        api,
+                        screenId
+                    });
+                    totalMocks++;
+                } catch { /* skip malformed URLs */ }
             }
         }
 
-        // Route handler for mocking
+        // Track unmatched requests for debugging
+        const unmatchedLog = [];
+
+        // Determine if we should block external requests
+        const blockExternal = this.currentReplay?.options?.blockExternal ?? false;
+
+        // Route handler with multi-tier matching
         await this.page.route('**/*', async (route, request) => {
             const url = request.url();
             const method = request.method();
 
-            // Find matching captured API
-            const match = allAPIs.find(api => {
-                try {
-                    const capturedUrl = new URL(api.url);
-                    const requestUrl = new URL(url);
-                    return capturedUrl.pathname === requestUrl.pathname && api.method === method;
-                } catch {
-                    return false;
+            // Skip non-API resources (let static assets pass through)
+            let pathname;
+            try {
+                pathname = new URL(url).pathname;
+            } catch {
+                await route.continue();
+                return;
+            }
+
+            // Skip static resources
+            if (/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)(\?|$)/.test(pathname)) {
+                await route.continue();
+                return;
+            }
+
+            const candidates = mockIndex.get(pathname);
+            if (!candidates || candidates.length === 0) {
+                // No mock found for this pathname
+                if (blockExternal) {
+                    console.log(`[UnifiedReplay] 🚫 Blocked (no mock): ${method} ${pathname}`);
+                    await route.abort('blockedbyclient');
+                } else {
+                    unmatchedLog.push({ method, url: pathname, reason: 'no_pathname_match' });
+                    await route.continue();
                 }
-            });
+                return;
+            }
 
-            if (match && match.response) {
-                console.log(`[UnifiedReplay] 🔄 Mocking: ${method} ${url}`);
+            // Tier 1: Exact match (method + pathname + request body hash)
+            let match = null;
+            const postData = request.postData();
+            const reqBodyHash = postData
+                ? crypto.createHash('md5').update(postData).digest('hex')
+                : null;
 
-                const body = typeof match.response === 'object'
-                    ? JSON.stringify(match.response)
-                    : String(match.response);
+            match = candidates.find(c => c.method === method && c.bodyHash === reqBodyHash);
+
+            // Tier 2: method + pathname (ignore body)
+            if (!match) {
+                match = candidates.find(c => c.method === method);
+            }
+
+            // Tier 3: pathname only (any method)
+            if (!match) {
+                match = candidates[0];
+                if (match) {
+                    console.log(`[UnifiedReplay] ⚠️ Fuzzy match (pathname only): ${method} ${pathname} → mocked as ${match.method}`);
+                }
+            }
+
+            if (match && match.api.response) {
+                console.log(`[UnifiedReplay] 🔄 Mocking: ${method} ${pathname}`);
+
+                const body = typeof match.api.response === 'object'
+                    ? JSON.stringify(match.api.response)
+                    : String(match.api.response);
 
                 await route.fulfill({
-                    status: match.status || 200,
-                    contentType: match.mimeType || 'application/json',
+                    status: match.api.status || 200,
+                    contentType: match.api.mimeType || 'application/json',
                     body: body
                 });
             } else {
-                await route.continue();
+                if (blockExternal) {
+                    console.log(`[UnifiedReplay] 🚫 Blocked (no response): ${method} ${pathname}`);
+                    await route.abort('blockedbyclient');
+                } else {
+                    unmatchedLog.push({ method, url: pathname, reason: 'no_response_body' });
+                    await route.continue();
+                }
             }
         });
 
-        console.log(`[UnifiedReplay] ✅ API mocking enabled with ${allAPIs.length} captured APIs`);
+        // Log unmatched requests periodically
+        const logInterval = setInterval(() => {
+            if (unmatchedLog.length > 0) {
+                console.log(`[UnifiedReplay] 📋 ${unmatchedLog.length} unmatched API requests:`);
+                const grouped = {};
+                unmatchedLog.forEach(r => {
+                    const key = `${r.method} ${r.url}`;
+                    grouped[key] = (grouped[key] || 0) + 1;
+                });
+                Object.entries(grouped).slice(0, 10).forEach(([key, count]) => {
+                    console.log(`  ❓ ${key} (×${count})`);
+                });
+                unmatchedLog.length = 0; // Clear after logging
+            }
+        }, 5000);
+
+        // Store interval for cleanup
+        this._unmatchedLogInterval = logInterval;
+
+        console.log(`[UnifiedReplay] ✅ API mocking enabled with ${totalMocks} captured APIs (${mockIndex.size} unique endpoints)`);
     }
 
     /**
@@ -533,6 +622,12 @@ class UnifiedReplayService {
      */
     async stopReplay() {
         console.log('[UnifiedReplay] 🛑 Stopping replay');
+
+        // Clear unmatched log interval
+        if (this._unmatchedLogInterval) {
+            clearInterval(this._unmatchedLogInterval);
+            this._unmatchedLogInterval = null;
+        }
 
         if (this.browser) {
             await this.browser.close().catch(() => { });

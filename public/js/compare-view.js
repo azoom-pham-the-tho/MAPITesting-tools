@@ -36,7 +36,7 @@ const CompareView = {
                 // Handle View Diff or Row click
                 const path1 = itemEl.dataset.path1;
                 const path2 = itemEl.dataset.path2;
-                
+
                 // Visual feedback
                 const btn = itemEl.querySelector('.btn-view-diff');
                 if (btn) btn.innerHTML = '<div class="spinner-tiny"></div>';
@@ -67,10 +67,10 @@ const CompareView = {
             // Preserve current values if possible
             const val1 = uiSelect1.value;
             const val2 = uiSelect2.value;
-            
+
             uiSelect1.innerHTML = '<option value="">-- Chọn Section 1 --</option>' + mainOption + options;
             uiSelect2.innerHTML = '<option value="">-- Chọn Section 2 --</option>' + mainOption + options;
-            
+
             if (val1) uiSelect1.value = val1;
             if (val2) uiSelect2.value = val2;
         }
@@ -79,12 +79,12 @@ const CompareView = {
         const apiSelect1 = document.getElementById('apiSection1');
         const apiSelect2 = document.getElementById('apiSection2');
         if (apiSelect1 && apiSelect2) {
-             const val1 = apiSelect1.value;
-             const val2 = apiSelect2.value;
+            const val1 = apiSelect1.value;
+            const val2 = apiSelect2.value;
 
             apiSelect1.innerHTML = '<option value="">-- Chọn Section 1 --</option>' + mainOption + options;
             apiSelect2.innerHTML = '<option value="">-- Chọn Section 2 --</option>' + mainOption + options;
-            
+
             if (val1) apiSelect1.value = val1;
             if (val2) apiSelect2.value = val2;
         }
@@ -123,7 +123,7 @@ const CompareView = {
                 // Convert _replay_replay to (replay x2), _backup_xxx to (backup)
                 const replayCount = (suffix.match(/_replay/g) || []).length;
                 const isBackup = suffix.includes('_backup');
-                
+
                 if (isBackup) {
                     formatted += ' 📦';
                 } else if (replayCount > 0) {
@@ -200,7 +200,7 @@ const CompareView = {
         }
     },
 
-    // Render comparison result
+    // Render comparison result (progressively for large lists)
     renderResult(result, type = 'ui') {
         const containerId = type === 'ui' ? 'compareResults' : 'apiResults';
         const container = document.getElementById(containerId);
@@ -233,33 +233,48 @@ const CompareView = {
         // Calculate enhanced statistics
         const enhancedStats = this.calculateEnhancedStats(filteredItems);
 
-        let html = `
-            <div class="compare-summary">
-                <div class="summary-header">
-                    <h3>📊 Kết quả so sánh ${type.toUpperCase()}</h3>
-                    <div class="summary-stats">
-                        <span class="stat changed"><span class="count">${summary.changed}</span> Thay đổi</span>
-                        <span class="stat added" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.added}</span> Thêm mới</span>
-                        <span class="stat removed" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.removed}</span> Đã xóa</span>
-                        <span class="stat unchanged" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.unchanged}</span> Không đổi</span>
-                    </div>
-                    ${enhancedStats.hasData ? this.renderEnhancedStats(enhancedStats, type) : ''}
+        // Render summary header immediately
+        container.innerHTML = `
+        <div class="compare-summary">
+            <div class="summary-header">
+                <h3>📊 Kết quả so sánh ${type.toUpperCase()}</h3>
+                <div class="summary-stats">
+                    <span class="stat changed"><span class="count">${summary.changed}</span> Thay đổi</span>
+                    <span class="stat added" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.added}</span> Thêm mới</span>
+                    <span class="stat removed" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.removed}</span> Đã xóa</span>
+                    <span class="stat unchanged" style="display:${type === 'api' ? 'none' : 'inline-flex'}"><span class="count">${summary.unchanged}</span> Không đổi</span>
                 </div>
+                ${enhancedStats.hasData ? this.renderEnhancedStats(enhancedStats, type) : ''}
             </div>
+        </div>
+        <div class="compare-items" id="${containerId}-items"></div>
+    `;
 
-            <div class="compare-items">
-        `;
+        const itemsContainer = document.getElementById(`${containerId}-items`);
 
         if (filteredItems.length === 0) {
-            html += `<div class="empty-state"><p>Không tìm thấy thay đổi nào về ${type.toUpperCase()}</p></div>`;
+            itemsContainer.innerHTML = `<div class="empty-state"><p>Không tìm thấy thay đổi nào về ${type.toUpperCase()}</p></div>`;
+            return;
+        }
+
+        // Use ProgressiveRenderer for large lists (>30 items), inline for small lists
+        if (filteredItems.length > 30 && window.ProgressiveRenderer) {
+            const renderer = new ProgressiveRenderer({
+                chunkSize: 50,
+                priorityChunkSize: 15
+            });
+            renderer.render(filteredItems, itemsContainer, (item) => {
+                const div = document.createElement('div');
+                div.innerHTML = this.renderCompareItem(item, type);
+                return div.firstElementChild;
+            });
         } else {
+            let html = '';
             for (const item of filteredItems) {
                 html += this.renderCompareItem(item, type);
             }
+            itemsContainer.innerHTML = html;
         }
-
-        html += '</div>';
-        container.innerHTML = html;
 
         // Note: Event delegation is now handled in init -> bindEvents
     },
@@ -560,7 +575,7 @@ const CompareView = {
 
         try {
             // Show loading state on the button/row is handled by caller
-            
+
             const response = await fetch('/api/compare/page-diff', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

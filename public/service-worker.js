@@ -1,19 +1,21 @@
-const CACHE_VERSION = 'v1';
-const STATIC_CACHE = 'static-v1';
-const DYNAMIC_CACHE = 'dynamic-v1';
+const CACHE_VERSION = 'v5';
+const STATIC_CACHE = 'static-v5';
+const DYNAMIC_CACHE = 'dynamic-v5';
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
+  '/css/api-tester.css',
   '/js/app.js',
   '/js/tree-view.js',
   '/js/preview.js',
   '/js/compare-view.js',
+  '/js/api-tester.js',
   '/js/utils/memory-monitor.js',
   '/js/utils/indexed-db.js',
   '/js/utils/progressive-renderer.js',
-  '/js/utils/performance-utils.js',
+
   '/js/utils/device-detector.js',
   '/js/utils/object-pool.js',
   '/js/utils/dom-pool.js',
