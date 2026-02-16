@@ -5,45 +5,285 @@
 
 /* Light Theme */
 :root[data-theme="light"] {
-  /* Background Colors */
+  /* Background Colors — warm blue-gray tones for cohesion */
   --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #ebebeb;
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --bg-glass: rgba(0, 0, 0, 0.03);
+  --bg-secondary: #f7f8fa;
+  --bg-tertiary: #eef1f5;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(0, 0, 0, 0.05);
 
   /* Text Colors */
-  --text-primary: #1a1a1a;
-  --text-secondary: #4a4a4a;
-  --text-muted: #757575;
+  --text-primary: #1a1d23;
+  --text-secondary: #4b5563;
+  --text-muted: #8b95a5;
 
-  /* Accent Colors */
-  --accent-primary: #0066cc;
-  --accent-secondary: #4a90e2;
-  --accent-gradient: linear-gradient(135deg, #0066cc 0%, #4a90e2 100%);
+  /* Accent Colors — clean blue, no purple */
+  --accent-primary: #2563eb;
+  --accent-secondary: #3b82f6;
+  --accent-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
 
-  /* Status Colors */
-  --success: #28a745;
-  --success-bg: rgba(40, 167, 69, 0.1);
-  --danger: #dc3545;
-  --danger-bg: rgba(220, 53, 69, 0.1);
-  --warning: #ffc107;
-  --warning-bg: rgba(255, 193, 7, 0.1);
-  --info: #17a2b8;
-  --info-bg: rgba(23, 162, 184, 0.1);
+  /* Status Colors — toned down for light bg */
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.08);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.08);
+  --info: #0891b2;
+  --info-bg: rgba(8, 145, 178, 0.08);
 
   /* Diff Colors */
-  --diff-main: #dc3545;
-  --diff-main-bg: rgba(220, 53, 69, 0.15);
-  --diff-section: #28a745;
-  --diff-section-bg: rgba(40, 167, 69, 0.15);
+  --diff-main: #dc2626;
+  --diff-main-bg: rgba(220, 38, 38, 0.1);
+  --diff-section: #16a34a;
+  --diff-section-bg: rgba(22, 163, 74, 0.1);
 
-  /* Border & Shadow */
-  --border-color: rgba(0, 0, 0, 0.12);
-  --border-glow: rgba(0, 102, 204, 0.3);
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.16);
+  /* Border & Shadow — visible but subtle */
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-glow: rgba(37, 99, 235, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  /* Gradient overrides */
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0.01) 100%);
+}
+
+/* ---- Light theme component overrides ---- */
+:root[data-theme="light"] .header {
+  background: #ffffff;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+:root[data-theme="light"] .header .header-left,
+:root[data-theme="light"] .header .header-center,
+:root[data-theme="light"] .header .header-right {
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .header .header-action-btn {
+  color: var(--text-secondary);
+}
+:root[data-theme="light"] .header .header-action-btn:hover {
+  color: var(--accent-primary);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* Round action buttons in header (settings, search, notification, theme) */
+:root[data-theme="light"] .header-actions > button,
+:root[data-theme="light"] .header-actions > .notification-bell-wrapper > button {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+  background: transparent;
+}
+:root[data-theme="light"] .header-actions > button:hover,
+:root[data-theme="light"] .header-actions > .notification-bell-wrapper > button:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* Tabs — clean look on light bg */
+:root[data-theme="light"] .tab-btn.active {
+  background: var(--accent-gradient);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+:root[data-theme="light"] .tab-btn:hover:not(.active) {
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--accent-primary);
+}
+
+/* Tree view — subtle selection */
+:root[data-theme="light"] .tree-item-content.selected {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-primary);
+}
+
+/* Document cards — clean borders */
+:root[data-theme="light"] .doc-card {
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+:root[data-theme="light"] .doc-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-md);
+}
+
+/* Sidebar categories */
+:root[data-theme="light"] .doc-category.active {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent-primary);
+}
+
+/* Settings panel */
+:root[data-theme="light"] .settings-panel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+}
+
+/* Buttons */
+:root[data-theme="light"] .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+:root[data-theme="light"] .btn-secondary:hover {
+  background: #e2e6ec;
+}
+
+/* Logo — dark text on light header */
+:root[data-theme="light"] .logo {
+  -webkit-text-fill-color: var(--text-primary);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Hero title — dark gradient for light bg */
+:root[data-theme="light"] .dash-hero-title {
+  background: linear-gradient(135deg, #1e3a8a 0%, #4338ca 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Hero card — subtle border */
+:root[data-theme="light"] .dash-hero-bg {
+  background: linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(99,102,241,0.04) 50%, rgba(59,130,246,0.03) 100%);
+  border-color: rgba(37,99,235,0.15);
+}
+
+/* Section cards — visible border */
+:root[data-theme="light"] .section-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+:root[data-theme="light"] .section-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-md);
+}
+
+/* Inner subtabs — light bg instead of dark overlay */
+:root[data-theme="light"] .inner-subtabs {
+  background: var(--bg-tertiary);
+  border-bottom-color: var(--border-color);
+}
+
+/* Share/Import buttons in header — dark text on light header */
+:root[data-theme="light"] .header .btn-secondary {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+:root[data-theme="light"] .header .btn-secondary:hover {
+  background: #e2e6ec !important;
+  color: var(--text-primary) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Project selector label in header */
+:root[data-theme="light"] .header .project-selector label {
+  color: var(--text-secondary);
+}
+
+/* Stat values in header */
+:root[data-theme="light"] .header .stat-label {
+  color: var(--text-muted);
+}
+:root[data-theme="light"] .header .stat-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Project select dropdown in header */
+:root[data-theme="light"] .header .select-input {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+:root[data-theme="light"] .header .select-input:hover {
+  border-color: var(--accent-primary);
+}
+:root[data-theme="light"] .header .select-input option {
+  background: #ffffff;
+  color: var(--text-primary);
+}
+
+/* Version History panel — remove dark shadow on light theme */
+:root[data-theme="light"] .version-panel {
+  background: var(--bg-primary);
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--border-color);
+}
+:root[data-theme="light"] .version-panel.expanded {
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+}
+:root[data-theme="light"] .version-panel-header {
+  background: var(--bg-tertiary);
+}
+
+/* Sidebar collapse button — smoother pill */
+.sidebar-collapse-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+.sidebar-collapse-btn:hover {
+  background: var(--bg-glass);
+  color: var(--accent-primary);
+  border-color: var(--border-color);
+}
+
+/* Sidebar expand button — sleek floating pill */
+.sidebar-expand-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 20px;
+  height: 56px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+}
+.sidebar-expand-btn:hover {
+  width: 24px;
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+  box-shadow: 2px 0 12px rgba(37, 99, 235, 0.2);
+}
+
+/* Resizer — light theme uses accent color on hover */
+:root[data-theme="light"] .resizer:hover,
+:root[data-theme="light"] .resizer.resizing {
+  background: var(--accent-primary);
+}
+:root[data-theme="light"] .resizer:hover::before {
+  background: var(--accent-primary);
 }
 
 /* Dark Theme (Default) */

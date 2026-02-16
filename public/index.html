@@ -1111,55 +1111,40 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <!-- Scripts -->
+  <!-- Scripts — Core (blocking, needed for first paint) -->
+  <script src="/js/utils/script-loader.js"></script>
+  <script src="/js/utils/device-detector.js"></script>
   <script src="js/app.js"></script>
   <script src="js/tree-view.js"></script>
   <script src="js/preview.js"></script>
+  <script src="js/dashboard-features.js"></script>
 
-  <!-- Performance & Memory Utils (load BEFORE rendering components) -->
-  <script src="/js/utils/memory-monitor.js"></script>
-  <script src="/js/utils/indexed-db.js"></script>
-  <script src="/js/utils/progressive-renderer.js"></script>
-
-  <script src="/js/utils/device-detector.js"></script>
-
-  <!-- Resource Pooling -->
-  <script src="/js/utils/object-pool.js"></script>
-  <script src="/js/utils/dom-pool.js"></script>
-  <script src="/js/utils/canvas-pool.js"></script>
-  <script src="/js/utils/worker-pool.js"></script>
-  <script src="/js/utils/image-pool.js"></script>
-
-  <!-- Rendering Components (depend on utils above) -->
-  <script src="js/diff-viewer.js"></script>
-  <script src="js/compare-view.js"></script>
-  <script src="js/document-compare.js"></script>
-
-  <!-- Pagination & PWA -->
-  <script src="/js/pagination.js"></script>
+  <!-- Lightweight utils (small, needed by multiple components) -->
   <script src="/js/sw-register.js"></script>
 
-  <!-- Lazy Loader -->
-
-  <script src="/js/lazy-loader.js"></script>
-
+  <!-- Essential UI (sidebar, UX, settings) -->
   <script src="js/ux-enhancements.js"></script>
-  <script src="js/dashboard-features.js"></script>
-  <script src="js/api-tester.js"></script>
-  <script src="js/test-runner-ui.js"></script>
-  <script src="js/report-ui.js"></script>
   <script src="js/version-ui.js"></script>
   <script src="js/comment-ui.js"></script>
   <script src="js/simple-settings.js"></script>
 
-  <!-- PDF.js for Document Preview -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    // Set worker source
-    if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-  </script>
+  <!--
+    LAZY LOADED scripts (loaded on-demand by ScriptLoader when user opens tab):
+    - js/diff-viewer.js              → Compare tab
+    - js/compare-view.js             → Compare tab
+    - js/utils/progressive-renderer.js → Compare tab (used by compare-view + diff-viewer)
+    - js/document-compare.js         → Documents tab
+    - PDF.js CDN                     → Documents tab (PDF preview)
+    - js/api-tester.js               → Testing tab
+    - js/test-runner-ui.js           → Testing tab
+    - js/report-ui.js                → Testing tab
+
+    UNUSED utils (kept in repo but not loaded):
+    - js/lazy-loader.js, js/pagination.js
+    - utils/memory-monitor.js, utils/object-pool.js, utils/dom-pool.js
+    - utils/canvas-pool.js, utils/image-pool.js, utils/worker-pool.js
+    - utils/indexed-db.js
+  -->
 </body>
 
 </html>

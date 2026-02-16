@@ -44,10 +44,14 @@ const VersionUI = {
     this._collapsed = !this._collapsed;
     const panel = this.panelEl;
     if (!panel) return;
-    const body = panel.querySelector('.version-panel-body');
     const arrow = panel.querySelector('.version-toggle-arrow');
-    if (body) body.style.display = this._collapsed ? 'none' : 'block';
-    if (arrow) arrow.style.transform = this._collapsed ? '' : 'rotate(90deg)';
+    if (this._collapsed) {
+      panel.classList.remove('expanded');
+      if (arrow) arrow.style.transform = '';
+    } else {
+      panel.classList.add('expanded');
+      if (arrow) arrow.style.transform = 'rotate(90deg)';
+    }
     // Lazy load on first expand
     if (!this._collapsed && !this._historyLoaded && state.currentProject) {
       this._historyLoaded = true;
@@ -66,12 +70,26 @@ const VersionUI = {
       /* Version Panel & Timeline Design */
       .version-panel {
         padding: 0;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: var(--bg-secondary, #1a1a2e);
         border-top: 1px solid var(--border-color);
-        background: transparent;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        transition: box-shadow 0.3s;
+      }
+      .version-panel.expanded {
+        box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
       }
       .version-panel-body {
-        max-height: 33vh;
+        max-height: 40vh;
         overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .version-panel:not(.expanded) .version-panel-body {
+        display: none;
       }
       .version-toggle-arrow {
         transition: transform 0.2s;
@@ -566,9 +584,12 @@ const VersionUI = {
   // PANEL CREATION
   // ================================================================
   createVersionPanel() {
-    // Find the left panel - look for the mainTree container's parent
-    const mainTree = document.getElementById('mainTree');
-    if (!mainTree) return;
+    // Find the left panel
+    const leftPanel = document.getElementById('leftPanel');
+    if (!leftPanel) return;
+
+    // Make left panel position:relative for absolute positioning of version panel
+    leftPanel.style.position = 'relative';
 
     const panel = document.createElement('div');
     panel.className = 'version-panel';
@@ -596,7 +617,6 @@ const VersionUI = {
     // Body wrapper (collapsed by default)
     const body = document.createElement('div');
     body.className = 'version-panel-body';
-    body.style.display = 'none'; // Collapsed by default
 
     // Search
     const search = document.createElement('div');
@@ -633,8 +653,8 @@ const VersionUI = {
 
     panel.appendChild(body);
 
-    // Insert after mainTree
-    mainTree.parentNode.insertBefore(panel, mainTree.nextSibling);
+    // Append to end of left panel (bottom)
+    leftPanel.appendChild(panel);
   },
 
   // ================================================================

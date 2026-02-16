@@ -220,31 +220,6 @@
           </select>
         </div>
 
-        <!-- Performance Monitor -->
-        <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px;">
-          <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">
-            ⚡ Performance Monitor
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
-            <div style="padding: 8px; background: var(--bg-primary); border-radius: 6px;">
-              <div style="color: var(--text-muted); margin-bottom: 4px;">FPS</div>
-              <div id="perf-fps" style="color: var(--success); font-weight: 600; font-size: 18px;">--</div>
-            </div>
-            <div style="padding: 8px; background: var(--bg-primary); border-radius: 6px;">
-              <div style="color: var(--text-muted); margin-bottom: 4px;">Lag</div>
-              <div id="perf-lag" style="color: var(--warning); font-weight: 600; font-size: 18px;">--</div>
-            </div>
-            <div style="padding: 8px; background: var(--bg-primary); border-radius: 6px;">
-              <div style="color: var(--text-muted); margin-bottom: 4px;">Memory</div>
-              <div id="perf-mem" style="color: var(--info); font-weight: 600; font-size: 18px;">--</div>
-            </div>
-            <div style="padding: 8px; background: var(--bg-primary); border-radius: 6px;">
-              <div style="color: var(--text-muted); margin-bottom: 4px;">Quality</div>
-              <div id="perf-quality" style="color: var(--accent-primary); font-weight: 600; font-size: 18px;">--</div>
-            </div>
-          </div>
-        </div>
-
         <!-- Cache Management -->
         <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -257,11 +232,6 @@
     },
 
     bindInputs() {
-      // Update performance metrics less frequently
-      this.lastPerfValues = {};
-      this.updatePerformanceMetrics();
-      this.perfInterval = setInterval(() => this.updatePerformanceMetrics(), 3000); // 3s instead of 1s
-
       // Update cache size
       this.calculateCacheSize().then(bytes => {
         const el = document.getElementById('cacheStorageSize');
@@ -321,58 +291,6 @@
       }
     },
 
-    updatePerformanceMetrics() {
-      const fpsEl = document.getElementById('perf-fps');
-      if (!fpsEl) return;
-
-      // Use native browser performance APIs
-      let fps, lag, mem, quality;
-
-      // FPS estimation via frame timing
-      const now = performance.now();
-      if (this._lastFrameTime) {
-        const delta = now - this._lastFrameTime;
-        fps = Math.round(Math.min(60, 1000 / Math.max(delta, 1)));
-      } else {
-        fps = 60;
-      }
-      this._lastFrameTime = now;
-
-      // Memory from browser API (Chrome only)
-      if (performance.memory) {
-        mem = Math.round((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100) + '%';
-      } else {
-        mem = 'N/A';
-      }
-
-      lag = '0%';
-      quality = this.current.performanceMode === 'auto' ? 'AUTO' : this.current.performanceMode.charAt(0).toUpperCase();
-
-      // Only update DOM if values changed (avoid unnecessary reflows)
-      if (this.lastPerfValues.fps !== fps) {
-        fpsEl.textContent = fps;
-        this.lastPerfValues.fps = fps;
-      }
-
-      const lagEl = document.getElementById('perf-lag');
-      if (lagEl && this.lastPerfValues.lag !== lag) {
-        lagEl.textContent = lag;
-        this.lastPerfValues.lag = lag;
-      }
-
-      const memEl = document.getElementById('perf-mem');
-      if (memEl && this.lastPerfValues.mem !== mem) {
-        memEl.textContent = mem;
-        this.lastPerfValues.mem = mem;
-      }
-
-      const qualityEl = document.getElementById('perf-quality');
-      if (qualityEl && this.lastPerfValues.quality !== quality) {
-        qualityEl.textContent = quality;
-        this.lastPerfValues.quality = quality;
-      }
-    },
-
     saveAndClose() {
       // Read all inputs
       this.current.performanceMode = document.getElementById('setting-performanceMode').value;
@@ -403,12 +321,6 @@
     },
 
     closePanel() {
-      // Clear performance monitoring interval
-      if (this.perfInterval) {
-        clearInterval(this.perfInterval);
-        this.perfInterval = null;
-      }
-
       const panel = document.getElementById('settingsPanel');
       if (panel) panel.remove();
     },
@@ -450,6 +362,39 @@
         document.documentElement.style.removeProperty('--transition-normal');
         document.documentElement.style.removeProperty('--transition-slow');
       }
+
+      // ===== Performance mode — integrate DeviceDetector =====
+      const mode = this.current.performanceMode || 'auto';
+      let tier = 'high'; // default
+
+      if (mode === 'auto' && window.DeviceDetector) {
+        const detector = new DeviceDetector();
+        tier = detector.tier; // 'low' | 'medium' | 'high'
+      } else if (mode !== 'auto') {
+        tier = mode; // user explicitly chose low/medium/high
+      }
+
+      // Remove old perf classes, add current
+      document.body.classList.remove('perf-low', 'perf-medium', 'perf-high');
+      document.body.classList.add('perf-' + tier);
+
+      // Set CSS variables based on tier
+      const root = document.documentElement;
+      if (tier === 'low') {
+        root.style.setProperty('--backdrop-blur', '0px');
+        root.style.setProperty('--shadow-heavy', 'none');
+        root.style.setProperty('--transition-fast', '0s');
+        root.style.setProperty('--transition-normal', '0s');
+      } else if (tier === 'medium') {
+        root.style.setProperty('--backdrop-blur', '4px');
+        root.style.setProperty('--shadow-heavy', '0 2px 8px rgba(0,0,0,0.2)');
+        // keep user's animation preference for transitions
+      } else {
+        root.style.removeProperty('--backdrop-blur');
+        root.style.removeProperty('--shadow-heavy');
+      }
+
+      console.log(`[Settings] Performance tier applied: ${tier}`);
     }
   };
 

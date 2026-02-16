@@ -1339,6 +1339,27 @@ const CompareView = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    // ===== Performance: Cleanup when leaving Compare tab =====
+    cleanup() {
+        try {
+            // Remove any open diff modals
+            document.querySelectorAll('.diff-modal').forEach(m => m.remove());
+
+            // Clear compare results DOM
+            const uiResults = document.getElementById('compareUIResults');
+            if (uiResults) uiResults.innerHTML = '';
+            const apiResults = document.getElementById('compareAPIResults');
+            if (apiResults) apiResults.innerHTML = '';
+
+            // Clear cached result
+            this.currentResult = null;
+
+            console.log('[CompareView] Cleanup completed');
+        } catch (e) {
+            console.warn('[CompareView] Cleanup error:', e);
+        }
     }
 };
 

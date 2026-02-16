@@ -57,55 +57,16 @@
   }
 
   // ========================================
-  // Loading Bar
+  // Loading Bar (DISABLED — tab content handles its own loading)
   // ========================================
 
   const loadingBar = {
     el: null,
-    activeRequests: 0,
-
-    init() {
-      this.el = document.createElement('div');
-      this.el.className = 'loading-bar';
-      document.body.prepend(this.el);
-    },
-
-    start() {
-      this.activeRequests++;
-      if (this.activeRequests === 1 && this.el) {
-        this.el.className = 'loading-bar active';
-      }
-    },
-
-    finish() {
-      this.activeRequests = Math.max(0, this.activeRequests - 1);
-      if (this.activeRequests === 0 && this.el) {
-        this.el.className = 'loading-bar complete';
-        setTimeout(() => {
-          if (this.activeRequests === 0 && this.el) {
-            this.el.className = 'loading-bar';
-          }
-        }, 500);
-      }
-    }
+    init() { /* disabled */ },
+    start() { /* disabled */ },
+    finish() { /* disabled */ }
   };
 
-  // Intercept fetch for automatic loading bar
-  const originalFetch = window.fetch;
-  window.fetch = function (...args) {
-    loadingBar.start();
-    return originalFetch.apply(this, args)
-      .then(response => {
-        loadingBar.finish();
-        return response;
-      })
-      .catch(err => {
-        loadingBar.finish();
-        throw err;
-      });
-  };
-
-  // ========================================
   // Toast Notification System
   // ========================================
 
@@ -539,99 +500,6 @@
   }
 
   // ========================================
-  // Context Menu
-  // ========================================
-
-  let contextMenu = null;
-
-  function showContextMenu(e, actions) {
-    e.preventDefault();
-    hideContextMenu();
-
-    contextMenu = document.createElement('div');
-    contextMenu.className = 'context-menu';
-
-    actions.forEach(action => {
-      if (action.separator) {
-        const sep = document.createElement('div');
-        sep.className = 'context-menu-separator';
-        contextMenu.appendChild(sep);
-        return;
-      }
-
-      const item = document.createElement('button');
-      item.className = `context-menu-item${action.danger ? ' danger' : ''}`;
-      item.innerHTML = `<span>${action.icon || ''}</span><span>${action.label}</span>`;
-      item.onclick = () => {
-        action.handler();
-        hideContextMenu();
-      };
-      contextMenu.appendChild(item);
-    });
-
-    // Position
-    const x = Math.min(e.clientX, window.innerWidth - 200);
-    const y = Math.min(e.clientY, window.innerHeight - contextMenu.children.length * 40);
-    contextMenu.style.left = x + 'px';
-    contextMenu.style.top = y + 'px';
-
-    document.body.appendChild(contextMenu);
-
-    // Close on click outside
-    setTimeout(() => {
-      document.addEventListener('click', hideContextMenu, { once: true });
-    }, 10);
-  }
-
-  function hideContextMenu() {
-    if (contextMenu) {
-      contextMenu.remove();
-      contextMenu = null;
-    }
-  }
-
-  // Setup tree context menus
-  function setupTreeContextMenus() {
-    document.addEventListener('contextmenu', (e) => {
-      const treeItem = e.target.closest('.tree-item-content');
-      if (!treeItem) return;
-
-      const label = treeItem.querySelector('.tree-label');
-      const nodeText = label ? label.textContent.trim() : 'Node';
-
-      showContextMenu(e, [
-        {
-          icon: '✎',
-          label: `Đổi tên "${nodeText}"`,
-          handler: () => toast.info('Chức năng đổi tên đang phát triển')
-        },
-        {
-          icon: '📋',
-          label: 'Sao chép',
-          handler: () => toast.info('Đã sao chép!')
-        },
-        { separator: true },
-        {
-          icon: '📤',
-          label: 'Xuất dữ liệu',
-          handler: () => toast.info('Đang xuất...')
-        },
-        { separator: true },
-        {
-          icon: '🗑️',
-          label: 'Xóa',
-          danger: true,
-          handler: () => {
-            if (confirm(`Xóa "${nodeText}"?`)) {
-              toast.success('Đã xóa!');
-            }
-          }
-        }
-      ]);
-    });
-  }
-
-  // ========================================
   // Auto-Save
   // ========================================
 
@@ -891,7 +759,6 @@
     toast.init();
     setupKeyboardShortcuts();
     setupButtonEffects();
-    setupTreeContextMenus();
     setupAutoSave();
     setupAccessibility();
     setupLazyImages();
@@ -904,8 +771,6 @@
     window.SmartUX = {
       toast,
       loadingBar,
-      showContextMenu,
-      hideContextMenu,
       openGlobalSearch,
       closeGlobalSearch,
       showShortcutsModal,

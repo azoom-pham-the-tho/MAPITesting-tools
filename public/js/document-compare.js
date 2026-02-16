@@ -2881,6 +2881,29 @@ class DocumentCompare {
       if (e.target === overlay) close();
     });
   }
+
+  // ===== Performance: Cleanup when leaving Documents tab =====
+  cleanup() {
+    try {
+      // Clear preview areas (heavy DOM with canvases/iframes)
+      const previewAreas = document.querySelectorAll('.doc-preview-area');
+      previewAreas.forEach(area => { area.innerHTML = ''; });
+
+      // Clear compare results
+      const compareArea = document.getElementById('docCompareArea');
+      if (compareArea) compareArea.innerHTML = '';
+
+      // Clear cached document data
+      this.currentDocument = null;
+      this.currentVersions = [];
+      this.changePositions = [];
+      this.currentChangeIndex = -1;
+
+      console.log('[DocumentCompare] Cleanup completed');
+    } catch (e) {
+      console.warn('[DocumentCompare] Cleanup error:', e);
+    }
+  }
 }
 
 // Global hooks

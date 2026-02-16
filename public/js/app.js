@@ -416,6 +416,47 @@ function setupModals() {
 }
 
 // ========================================
+// Tab Cleanup — Release resources when leaving a tab
+// ========================================
+
+function _cleanupTab(tabName) {
+  try {
+    switch (tabName) {
+      case 'documents':
+        // Revoke blob URLs + clear heavy DOM
+        if (window.docCompare && typeof docCompare.cleanup === 'function') {
+          docCompare.cleanup();
+        }
+        break;
+
+      case 'compare':
+        // Release canvases + diff images
+        if (window.CompareView && typeof CompareView.cleanup === 'function') {
+          CompareView.cleanup();
+        }
+        break;
+
+      case 'testing':
+        // Clear large response bodies
+        if (window.ApiTester && typeof ApiTester.cleanup === 'function') {
+          ApiTester.cleanup();
+        }
+        break;
+
+      case 'dashboard':
+        // Dashboard is lightweight — no cleanup needed
+        break;
+
+      case 'sitemap':
+        // Sitemap nodes stay cached for fast re-render
+        break;
+    }
+  } catch (err) {
+    console.warn('[_cleanupTab] Error cleaning up tab:', tabName, err);
+  }
+}
+
+// ========================================
 // Tab Management
 // ========================================
 
@@ -439,12 +480,18 @@ function setupTabs() {
     documents: "flex",
   };
 
-  tabList.addEventListener("click", (e) => {
+  tabList.addEventListener("click", async (e) => {
     const btn = e.target.closest(".tab-btn");
     if (!btn) return;
 
     const tabName = btn.dataset.tab;
     if (!tabName) return;
+
+    // ===== Cleanup previous tab before switching =====
+    const prevTab = state.activeTab;
+    if (prevTab && prevTab !== tabName) {
+      _cleanupTab(prevTab);
+    }
 
     // Update active button (all tab buttons, including dynamically added)
     tabList.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
@@ -469,38 +516,63 @@ function setupTabs() {
     }
 
     state.activeTab = tabName;
+    // Persist active tab for page reload
+    try { localStorage.setItem('mapit-active-tab', tabName); } catch (e) { }
 
-    // Load dashboard data when switching to dashboard tab
-    if (tabName === "dashboard" && window.DashboardFeatures) {
-      DashboardFeatures.analytics.loadDashboard();
-    }
-
-    // Load sitemap if switching to sitemap tab
-    if (tabName === "sitemap" && state.currentProject) {
-      loadSitemapWorkspace();
-    }
-
-    // Load documents when switching to documents tab
-    if (tabName === "documents" && window.docCompare) {
-      docCompare.loadDocuments();
-    }
-
-    // Load compare sections when switching to compare tab
-    if (tabName === "compare" && state.currentProject) {
-      if (window.CompareView) {
-        CompareView.populateSections(state.sections);
+    // ===== Lazy load + init per tab =====
+    try {
+      if (tabName === "dashboard") {
+        if (window.DashboardFeatures) {
+          DashboardFeatures.analytics.loadDashboard();
+          DashboardFeatures.analytics._dashboardNeedsRefresh = false;
+        }
       }
-    }
 
-    // Load testing data when switching to testing tab
-    if (tabName === "testing") {
-      if (window.TestRunnerUI) {
-        TestRunnerUI.loadHistory();
-        TestRunnerUI.loadStatistics();
+      if (tabName === "sitemap" && state.currentProject) {
+        loadSitemapWorkspace();
       }
-      if (window.ReportUI) {
-        ReportUI.loadReports();
+
+      if (tabName === "documents") {
+        await ScriptLoader.loadAll([
+          '/js/document-compare.js',
+        ]);
+        // Load PDF.js only when needed (lazy)
+        if (!window.pdfjsLib) {
+          await ScriptLoader.load('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          }
+        }
+        if (window.docCompare) docCompare.loadDocuments();
       }
+
+      if (tabName === "compare" && state.currentProject) {
+        await ScriptLoader.loadAll([
+          '/js/utils/progressive-renderer.js',
+          '/js/diff-viewer.js',
+          '/js/compare-view.js',
+        ]);
+        if (window.CompareView) {
+          CompareView.populateSections(state.sections);
+        }
+      }
+
+      if (tabName === "testing") {
+        await ScriptLoader.loadAll([
+          '/js/api-tester.js',
+          '/js/test-runner-ui.js',
+          '/js/report-ui.js',
+        ]);
+        if (window.TestRunnerUI) {
+          TestRunnerUI.loadHistory();
+          TestRunnerUI.loadStatistics();
+        }
+        if (window.ReportUI) {
+          ReportUI.loadReports();
+        }
+      }
+    } catch (err) {
+      console.error(`[setupTabs] Error loading scripts for tab "${tabName}":`, err);
     }
   });
 
@@ -754,19 +826,18 @@ async function selectProject(projectName) {
       ApiTester._needsRefresh = true;
     }
 
-    // Auto-switch to Dashboard View
-    const dashboardTabBtn = document.querySelector(
-      '.tab-btn[data-tab="dashboard"]',
-    );
-    if (dashboardTabBtn) {
-      if (dashboardTabBtn.classList.contains("active")) {
-        // Already on dashboard, just load data
-        if (window.DashboardFeatures) {
-          DashboardFeatures.analytics.loadDashboard();
-        }
-      } else {
-        dashboardTabBtn.click();
-      }
+    // Always update dashboard hero immediately (lightweight DOM update)
+    const heroTitle = document.getElementById('dashProjectName');
+    const heroDesc = document.getElementById('dashProjectDesc');
+    if (heroTitle) heroTitle.textContent = '📋 ' + projectName;
+    if (heroDesc) {
+      const sCount = state.sections ? state.sections.length : 0;
+      heroDesc.textContent = sCount + ' phiên bản đã chụp';
+    }
+
+    // Full dashboard refresh if currently on dashboard tab
+    if (state.activeTab === 'dashboard' && window.DashboardFeatures) {
+      DashboardFeatures.analytics.loadDashboard();
     }
   } catch (error) {
     console.error('[selectProject] Error loading project:', error);
@@ -1931,9 +2002,23 @@ function setupEventListeners() {
 // ========================================
 
 async function init() {
+  // Read saved tab EARLY to prevent dashboard flash
+  const savedTab = localStorage.getItem('mapit-active-tab');
+  if (savedTab && savedTab !== 'dashboard') {
+    state.activeTab = savedTab;
+    // Hide dashboard content immediately (it's visible by default in HTML)
+    const dashEl = document.getElementById('dashboardTab');
+    if (dashEl) dashEl.style.display = 'none';
+  }
+
   setupModals();
   setupTabs();
   setupEventListeners();
+
+  // Now switch to saved tab (triggers lazy loading for that tab)
+  if (savedTab && savedTab !== 'dashboard') {
+    switchTab(savedTab);
+  }
 
   await loadProjects();
 
@@ -2029,6 +2114,22 @@ document.addEventListener("DOMContentLoaded", () => {
   setupPanelToggles();
   setupSidebarTabs();
   setupCaptureUI();
+
+  // ===== Prefetch tab scripts during idle time =====
+  // After core init, queue all lazy-load scripts to prefetch in background.
+  // They load one-by-one during requestIdleCallback windows → zero jank.
+  // If user clicks a tab before prefetch finishes, ScriptLoader.load() handles it.
+  if (window.ScriptLoader) {
+    ScriptLoader.prefetchWhenIdle([
+      '/js/utils/progressive-renderer.js',
+      '/js/diff-viewer.js',
+      '/js/compare-view.js',
+      '/js/document-compare.js',
+      '/js/api-tester.js',
+      '/js/test-runner-ui.js',
+      '/js/report-ui.js',
+    ]);
+  }
 });
 
 // ========================================

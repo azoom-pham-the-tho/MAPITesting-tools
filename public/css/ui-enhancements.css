@@ -88,10 +88,10 @@
    3. ENHANCED HEADER
 ======================================== */
 .header {
-  background: linear-gradient(180deg, rgba(15,15,26,0.95) 0%, rgba(26,26,46,0.9) 100%);
+  background: var(--bg-secondary);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid rgba(102, 126, 234, 0.15);
+  border-bottom: 1px solid var(--border-color);
   position: relative;
 }
 
@@ -337,8 +337,8 @@
   display: flex;
   gap: 2px;
   padding: 8px 16px 0;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.08);
-  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-glass);
 }
 
 .subtab-btn {
@@ -427,8 +427,8 @@
 
 .tree-children {
   border-left: 1px solid rgba(102, 126, 234, 0.12);
-  margin-left: 12px;
-  padding-left: 8px;
+  margin-left: 6px;
+  padding-left: 2px;
 }
 
 .tree-toggle {
@@ -442,7 +442,7 @@
 }
 
 .tree-label {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .tree-badge {
@@ -462,7 +462,7 @@
 ======================================== */
 .section-card {
   background: var(--gradient-glass);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   transition: all var(--transition-smooth);
   contain: content;
@@ -503,10 +503,10 @@
 }
 
 .modal-content {
-  background: linear-gradient(180deg, rgba(26,26,46,0.98) 0%, rgba(22,33,62,0.98) 100%);
-  border: 1px solid rgba(102, 126, 234, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(102, 126, 234, 0.08);
+  box-shadow: var(--shadow-lg);
   animation: modal-enter 0.25s var(--ease-out-expo);
 }
 
@@ -567,8 +567,8 @@
 .select-input,
 .input,
 .text-input {
-  background: rgba(15, 15, 26, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px 14px;
   color: var(--text-primary);
@@ -580,9 +580,9 @@
 .input:focus,
 .text-input:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15), var(--glow-primary);
+  box-shadow: 0 0 0 3px var(--border-glow);
   outline: none;
-  background: rgba(15, 15, 26, 0.7);
+  background: var(--bg-secondary);
 }
 
 .select-input:hover,
@@ -611,12 +611,12 @@
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
-  background: rgba(26, 26, 46, 0.95);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-lg);
   animation: toast-in 0.3s var(--ease-spring);
   max-width: 380px;
 }
@@ -673,7 +673,7 @@
 
 .toast-close:hover {
   opacity: 1;
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-glass);
 }
 
 /* ========================================
@@ -824,10 +824,10 @@
 }
 
 .sitemap-overlay-tools .search-box {
-  background: rgba(26, 26, 46, 0.9) !important;
+  background: var(--bg-card) !important;
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(102, 126, 234, 0.15) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 .sitemap-overlay-tools .search-box input {
@@ -840,10 +840,10 @@
 }
 
 .sitemap-overlay-tools .zoom-controls {
-  background: rgba(26, 26, 46, 0.9) !important;
+  background: var(--bg-card) !important;
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(102, 126, 234, 0.15) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 /* ========================================
@@ -852,10 +852,10 @@
 .context-menu {
   position: fixed;
   z-index: 10000;
-  background: rgba(26, 26, 46, 0.98);
+  background: var(--bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(102, 126, 234, 0.15);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 4px;
   min-width: 180px;
@@ -902,7 +902,7 @@
 
 .context-menu-separator {
   height: 1px;
-  background: rgba(255,255,255,0.06);
+  background: var(--border-color);
   margin: 4px 8px;
 }
 
@@ -928,8 +928,8 @@
 }
 
 .shortcuts-panel {
-  background: rgba(26, 26, 46, 0.98);
-  border: 1px solid rgba(102, 126, 234, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 24px 28px;
   max-width: 500px;
@@ -1008,12 +1008,12 @@
 }
 
 .global-search-box {
-  background: rgba(26, 26, 46, 0.98);
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
   width: 90%;
   max-width: 520px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 40px rgba(102,126,234,0.08);
+  box-shadow: var(--shadow-lg);
   animation: modal-enter 0.2s var(--ease-out-expo);
   overflow: hidden;
 }
@@ -1135,8 +1135,8 @@
 }
 
 .doc-search {
-  background: rgba(15, 15, 26, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 6px 12px;
   color: var(--text-primary);

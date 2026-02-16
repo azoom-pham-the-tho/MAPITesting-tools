@@ -1826,6 +1826,24 @@
 
     window.ApiTester = {
         init: init,
-        populateCapturedApis: populateCapturedApis
+        populateCapturedApis: populateCapturedApis,
+        // ===== Performance: Cleanup when leaving Testing tab =====
+        cleanup: function () {
+            try {
+                // Clear heavy response body DOM
+                var bodyEl = document.getElementById('apiResponseBody');
+                if (bodyEl) bodyEl.innerHTML = '';
+                var headersEl = document.getElementById('apiResponseHeaders');
+                if (headersEl) headersEl.innerHTML = '';
+                var diffEl = document.getElementById('apiResponseDiff');
+                if (diffEl) diffEl.innerHTML = '';
+                var infoEl = document.getElementById('apiResponseInfo');
+                if (infoEl) infoEl.innerHTML = '';
+
+                console.log('[ApiTester] Cleanup completed');
+            } catch (e) {
+                console.warn('[ApiTester] Cleanup error:', e);
+            }
+        }
     };
 })();
