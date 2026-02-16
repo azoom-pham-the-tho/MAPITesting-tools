@@ -543,6 +543,46 @@ body,
     border-color var(--transition-normal);
 }
 
+/* Device Profile Selector — active state */
+.device-profile-btn.active {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  font-weight: 600;
+}
+.device-profile-btn {
+  transition: none;
+  will-change: background-color, color;
+}
+.device-profile-btn:not(.active):hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+:root[data-theme="light"] .device-profile-btn.active {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Disable expensive theme-transition on buttons/inputs inside modals */
+.modal .btn,
+.modal .input {
+  transition: none;
+}
+
+/* Sitemap Device Selector — active state */
+.sitemap-device-btn.active {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+.sitemap-device-btn {
+  transition: none;
+}
+
 /* Accessibility - Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * {

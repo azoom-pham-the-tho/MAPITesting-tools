@@ -381,6 +381,18 @@
             </div>
             <div class="sitemap-overlay-tools"
               style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px; align-items: center;">
+              <div id="sitemapDeviceSelector" class="zoom-controls"
+                style="display: flex; gap: 4px; background: var(--bg-secondary); padding: 4px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                <button class="btn btn-secondary btn-xs sitemap-device-btn active" data-device="desktop" title="Desktop">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </button>
+                <button class="btn btn-secondary btn-xs sitemap-device-btn" data-device="tablet" title="Tablet">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>
+                </button>
+                <button class="btn btn-secondary btn-xs sitemap-device-btn" data-device="mobile" title="Mobile">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>
+                </button>
+              </div>
               <div class="search-box"
                 style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid var(--border-color); display: flex; align-items: center;">
                 <span style="font-size: 12px; margin-right: 4px;">🔍</span>
@@ -803,6 +815,20 @@
             đây:</label>
           <div id="urlHistoryList" class="url-history-list"
             style="display: flex; flex-direction: column; gap: 4px;">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px;">Thiết bị capture:</label>
+          <div id="deviceProfileBtns" style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-xs btn-secondary device-profile-btn active" data-profile="desktop" title="Viewport mặc định của trình duyệt">🖥 Desktop</button>
+            <button type="button" class="btn btn-xs btn-secondary device-profile-btn" data-profile="tablet" title="Viewport 768×1024, User-Agent iPad">⬛ Tablet</button>
+            <button type="button" class="btn btn-xs btn-secondary device-profile-btn" data-profile="mobile" title="Viewport 375×812, User-Agent iPhone">📱 Mobile</button>
+            <button type="button" class="btn btn-xs btn-secondary device-profile-btn" data-profile="custom" title="Nhập kích thước tuỳ chỉnh">⚙ Tuỳ chỉnh</button>
+          </div>
+          <div id="deviceCustomInputs" style="display: none; margin-top: 8px; gap: 8px; align-items: center;">
+            <input type="number" id="deviceCaptureW" class="input" placeholder="Width" min="280" max="3840" style="width: 90px; font-size: 12px;" title="Chiều rộng viewport (px)">
+            <span style="color: var(--text-muted); font-size: 12px;">×</span>
+            <input type="number" id="deviceCaptureH" class="input" placeholder="Height" min="400" max="2560" style="width: 90px; font-size: 12px;" title="Chiều cao viewport (px)">
           </div>
         </div>
         <p class="hint" style="margin-top: 16px;">Trình duyệt sẽ mở để bạn thao tác. Đóng trình duyệt khi hoàn tất

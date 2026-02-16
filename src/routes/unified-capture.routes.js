@@ -108,7 +108,7 @@ async function collectAllScreens(dir, results = [], depth = 0) {
  */
 router.post('/start', async (req, res, next) => {
     try {
-        const { projectName, startUrl } = req.body;
+        const { projectName, startUrl, deviceProfile } = req.body;
 
         if (!projectName) {
             return res.status(400).json({ error: 'Project name is required' });
@@ -125,7 +125,7 @@ router.post('/start', async (req, res, next) => {
             return res.status(400).json({ error: 'Invalid URL format' });
         }
 
-        const result = await unifiedCaptureService.startSession(projectName, startUrl);
+        const result = await unifiedCaptureService.startSession(projectName, startUrl, deviceProfile);
         res.json({ success: true, ...result });
     } catch (error) {
         next(error);
@@ -455,6 +455,9 @@ router.get('/preview/:projectName/:section/*', async (req, res, next) => {
             // If thumbnail mode, strip heavy content for lightweight preview
             if (isThumbnail) {
                 html = stripForThumbnail(html);
+            } else {
+                // Fix icon fonts: replace relative @font-face with CDN for reliability
+                html = fixIconFontUrls(html);
             }
             return res.type('text/html').send(html);
         }
@@ -496,6 +499,29 @@ router.get('/preview/:projectName/:section/*', async (req, res, next) => {
         next(error);
     }
 });
+
+/**
+ * Fix icon font @font-face URLs in captured HTML.
+ * Converts ALL relative font URLs inside @font-face to absolute URLs
+ * using the <base> tag origin, so fonts load regardless of preview origin.
+ * Works for any project: MDI, Font Awesome, custom icon fonts, etc.
+ */
+function fixIconFontUrls(html) {
+    // Extract origin from <base> tag
+    const baseMatch = html.match(/<base\s+href="([^"]+)"/);
+    if (!baseMatch) return html;
+    const origin = baseMatch[1].replace(/\/+$/, ''); // e.g. https://app.example.com
+
+    // Find ALL @font-face blocks and convert relative URLs to absolute
+    html = html.replace(/@font-face\s*\{[^}]+\}/g, function (fontFace) {
+        // Replace relative url() paths with absolute: url(/path) → url(https://origin/path)
+        return fontFace.replace(/url\(\s*['"]?(\/[^'")]+)['"]?\s*\)/g, function (match, relPath) {
+            return 'url(' + origin + relPath + ')';
+        });
+    });
+
+    return html;
+}
 
 /**
  * Strip heavy content from HTML for lightweight thumbnail preview

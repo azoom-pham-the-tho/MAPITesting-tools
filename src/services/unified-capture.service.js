@@ -140,7 +140,7 @@ class UnifiedCaptureService {
     /**
      * Start a new capture session
      */
-    async startSession(projectName, startUrl) {
+    async startSession(projectName, startUrl, deviceProfile) {
         if (this.browser) {
             console.log('[UnifiedCapture] Session already running, resetting...');
             await this.resetState();
@@ -196,10 +196,32 @@ class UnifiedCaptureService {
                 ]
             });
 
-            this.context = await this.browser.newContext({
-                viewport: null,
+            // Resolve device profile for viewport/userAgent
+            const DEVICE_PRESETS = {
+                desktop: { viewport: null, userAgent: null },
+                tablet: { viewport: { width: 768, height: 1024 }, userAgent: 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15' },
+                mobile: { viewport: { width: 375, height: 812 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1' }
+            };
+
+            const profileName = (deviceProfile && deviceProfile.name) || 'desktop';
+            let resolved = DEVICE_PRESETS[profileName] || DEVICE_PRESETS.desktop;
+
+            // Custom profile with user-provided dimensions
+            if (profileName === 'custom' && deviceProfile) {
+                const w = Math.max(280, Math.min(3840, parseInt(deviceProfile.width) || 1440));
+                const h = Math.max(400, Math.min(2560, parseInt(deviceProfile.height) || 900));
+                resolved = { viewport: { width: w, height: h }, userAgent: null };
+            }
+
+            const contextOptions = {
+                viewport: resolved.viewport,
                 ignoreHTTPSErrors: true
-            });
+            };
+            if (resolved.userAgent) {
+                contextOptions.userAgent = resolved.userAgent;
+            }
+
+            this.context = await this.browser.newContext(contextOptions);
 
             this.page = await this.context.newPage();
 
@@ -243,6 +265,7 @@ class UnifiedCaptureService {
                 captures: [],
                 flowGraph: {
                     domain,
+                    deviceProfile: profileName,
                     nodes: [{ id: 'start', name: 'Start', type: 'start', path: startPath }],
                     edges: []
                 },
@@ -1372,7 +1395,7 @@ class UnifiedCaptureService {
             // Capture BOTH HTML and DOM tree (after user confirmed, not during freeze)
             // HTML = exact reproduction for preview/replay
             // DOM = structured tree for element-level comparison (with computed styles)
-            const { html, dom } = await this.page.evaluate(() => {
+            const { html, dom } = await this.page.evaluate(async () => {
                 // CSS properties critical for visual comparison
                 const STYLE_PROPS = [
                     'color', 'backgroundColor', 'fontSize', 'fontWeight', 'fontFamily',
@@ -1509,6 +1532,52 @@ class UnifiedCaptureService {
                 if (captureModal) captureModal.remove();
                 if (captureOverlay) captureOverlay.remove();
 
+                // Inline all @font-face fonts as base64 so preview works without original server
+                try {
+                    const fontPromises = [];
+                    for (const sheet of document.styleSheets) {
+                        try {
+                            for (const rule of sheet.cssRules) {
+                                if (rule instanceof CSSFontFaceRule) {
+                                    const family = rule.style.getPropertyValue('font-family');
+                                    const weight = rule.style.getPropertyValue('font-weight') || 'normal';
+                                    const style = rule.style.getPropertyValue('font-style') || 'normal';
+                                    const src = rule.style.getPropertyValue('src');
+                                    // Extract woff2 URL first, fallback to woff
+                                    const woff2 = src.match(/url\(["']?([^"')]+\.woff2)["']?\)/);
+                                    const woff = src.match(/url\(["']?([^"')]+\.woff)["']?\)/);
+                                    const fontUrl = (woff2 && woff2[1]) || (woff && woff[1]);
+                                    if (fontUrl && family) {
+                                        fontPromises.push({ family, weight, style, url: fontUrl, format: woff2 ? 'woff2' : 'woff' });
+                                    }
+                                }
+                            }
+                        } catch (e) { /* cross-origin stylesheet — skip */ }
+                    }
+
+                    // Fetch and inline each font (limit to 5 to avoid slowness)
+                    const toInline = fontPromises.slice(0, 5);
+                    for (const ff of toInline) {
+                        try {
+                            const resp = await fetch(ff.url);
+                            if (!resp.ok) continue;
+                            const blob = await resp.blob();
+                            // Skip if too large (> 2MB)
+                            if (blob.size > 2 * 1024 * 1024) continue;
+                            const base64 = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(blob);
+                            });
+                            const inlineStyle = document.createElement('style');
+                            inlineStyle.setAttribute('data-inlined-font', 'true');
+                            inlineStyle.textContent = `@font-face{font-family:${ff.family};font-style:${ff.style};font-weight:${ff.weight};src:url(${base64}) format("${ff.format}")}`;
+                            document.head.appendChild(inlineStyle);
+                        } catch (e) { /* font fetch failed — skip */ }
+                    }
+                } catch (e) { /* font inlining failed — continue without */ }
+
                 // Capture HTML and DOM while UI elements are removed
                 const html = document.documentElement.outerHTML;
                 const dom = serialize(document.body);
@@ -1529,6 +1598,7 @@ class UnifiedCaptureService {
                     processedHtml = html.replace(/<head([^>]*)>/i, `<head$1><base href="${origin}/">`);
                 }
             } catch (e) { /* URL parse error — use raw html */ }
+
 
             // Create folder — NESTED based on parent chain from flowGraph
             const nestedRelPath = this._buildNestedPath(captureId, parentId);

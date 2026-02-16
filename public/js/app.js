@@ -149,10 +149,10 @@ const api = {
   },
 
   // Capture
-  async startCapture(projectName, startUrl) {
+  async startCapture(projectName, startUrl, deviceProfile) {
     return this.fetch("/api/capture/start", {
       method: "POST",
-      body: JSON.stringify({ projectName, startUrl }),
+      body: JSON.stringify({ projectName, startUrl, deviceProfile }),
     });
   },
 
@@ -645,15 +645,21 @@ async function loadCompareSelectors() {
   try {
     const { sections } = await api.getSections(state.currentProject);
 
-    const select1 = document.getElementById("compareSection1");
-    const select2 = document.getElementById("compareSection2");
+    var DEVICE_ICONS = { desktop: '🖥', tablet: '⬛', mobile: '📱', custom: '⚙' };
+
+    var select1 = document.getElementById("compareSection1");
+    var select2 = document.getElementById("compareSection2");
 
     if (select1 && select2) {
-      const options = sections
-        .map(
-          (s) =>
-            `<option value="${s.timestamp}">${formatTimestamp(s.timestamp)}</option>`,
-        )
+      var options = sections
+        .map(function (s) {
+          var tag = '';
+          if (s.deviceProfile && s.deviceProfile !== 'desktop') {
+            var icon = DEVICE_ICONS[s.deviceProfile] || '';
+            tag = ' ' + icon + ' ' + (s.deviceProfile.charAt(0).toUpperCase() + s.deviceProfile.slice(1));
+          }
+          return '<option value="' + s.timestamp + '">' + formatTimestamp(s.timestamp) + tag + '</option>';
+        })
         .join("");
 
       select1.innerHTML =
@@ -1285,7 +1291,7 @@ async function deleteSection(timestamp) {
 // ========================================
 
 async function startCapture() {
-  const startUrl = elements.startUrlInput.value.trim();
+  var startUrl = elements.startUrlInput.value.trim();
 
   if (!startUrl) {
     showToast("Vui lòng nhập URL", "warning");
@@ -1299,8 +1305,22 @@ async function startCapture() {
     return;
   }
 
+  // Read device profile from selector
+  var deviceProfile = 'desktop';
+  var activeBtn = document.querySelector('#deviceProfileBtns .device-profile-btn.active');
+  if (activeBtn) {
+    deviceProfile = activeBtn.dataset.profile;
+  }
+  var devicePayload = { name: deviceProfile };
+  if (deviceProfile === 'custom') {
+    var cw = parseInt(document.getElementById('deviceCaptureW').value) || 1440;
+    var ch = parseInt(document.getElementById('deviceCaptureH').value) || 900;
+    devicePayload.width = Math.max(280, Math.min(3840, cw));
+    devicePayload.height = Math.max(400, Math.min(2560, ch));
+  }
+
   try {
-    const result = await api.startCapture(state.currentProject, startUrl);
+    var result = await api.startCapture(state.currentProject, startUrl, devicePayload);
     showToast("Đã mở trình duyệt. Nhấn ESC để chụp màn hình.", "info");
     closeModal(elements.newSectionModal);
     elements.startUrlInput.value = "";
@@ -1310,8 +1330,8 @@ async function startCapture() {
     state.currentCaptureSection = result.sectionTimestamp || result.sectionId || new Date().toISOString().replace(/:/g, '-').replace(/\..+/, 'Z');
 
     // Update capture info
-    const urlEl = document.getElementById('currentCaptureUrl');
-    const projectEl = document.getElementById('currentCaptureProject');
+    var urlEl = document.getElementById('currentCaptureUrl');
+    var projectEl = document.getElementById('currentCaptureProject');
     if (urlEl) urlEl.textContent = startUrl;
     if (projectEl) projectEl.textContent = state.currentProject;
 
@@ -1955,6 +1975,23 @@ function setupEventListeners() {
   });
   elements.startCaptureBtn.addEventListener("click", startCapture);
 
+  // Device profile selector toggle
+  var deviceProfileBtns = document.getElementById('deviceProfileBtns');
+  var deviceCustomInputs = document.getElementById('deviceCustomInputs');
+  if (deviceProfileBtns) {
+    deviceProfileBtns.addEventListener('click', function (e) {
+      var btn = e.target.closest('.device-profile-btn');
+      if (!btn) return;
+      deviceProfileBtns.querySelectorAll('.device-profile-btn').forEach(function (b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      if (deviceCustomInputs) {
+        deviceCustomInputs.style.display = btn.dataset.profile === 'custom' ? 'flex' : 'none';
+      }
+    });
+  }
+
   // Capture
   elements.stopCaptureBtn.addEventListener("click", stopCapture);
 
@@ -1994,6 +2031,16 @@ function setupEventListeners() {
     elements.resetWorkspaceSitemapBtn.addEventListener("click", () =>
       resetSitemapLayout(),
     );
+  }
+
+  // Sitemap Device Selector
+  var sitemapDeviceSelector = document.getElementById('sitemapDeviceSelector');
+  if (sitemapDeviceSelector) {
+    sitemapDeviceSelector.addEventListener('click', function (e) {
+      var btn = e.target.closest('.sitemap-device-btn');
+      if (!btn) return;
+      applySitemapDeviceView(btn.dataset.device);
+    });
   }
 }
 
@@ -2337,23 +2384,78 @@ const isMatch = (a, b) => {
 let sitemapFlowData = null;
 let sitemapNodePositions = new Map(); // Module-level for reuse during drag
 
+// Sitemap Device View Presets
+// iframeW/iframeH = viewport size the iframe renders at (for responsive content)
+// nodeW = visual node width on sitemap canvas
+var SITEMAP_DEVICE_PRESETS = {
+  desktop: { nodeW: 280, thumbH: 180, spacingX: 420, spacingY: 300, iframeW: 1400, iframeH: 800 },
+  tablet: { nodeW: 200, thumbH: 260, spacingX: 330, spacingY: 360, iframeW: 768, iframeH: 1024 },
+  mobile: { nodeW: 140, thumbH: 280, spacingX: 270, spacingY: 400, iframeW: 375, iframeH: 812 }
+};
+var currentSitemapDevice = 'desktop';
+
+function applySitemapDeviceView(device) {
+  var preset = SITEMAP_DEVICE_PRESETS[device] || SITEMAP_DEVICE_PRESETS.desktop;
+  currentSitemapDevice = device;
+  var workspace = elements.sitemapWorkspace;
+  if (!workspace) return;
+  workspace.style.setProperty('--sitemap-node-w', preset.nodeW + 'px');
+  workspace.style.setProperty('--sitemap-thumb-h', preset.thumbH + 'px');
+
+  // Update active button
+  var selector = document.getElementById('sitemapDeviceSelector');
+  if (selector) {
+    selector.querySelectorAll('.sitemap-device-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.device === device);
+    });
+  }
+
+  // Re-render layout with new spacings
+  if (sitemapFlowData && elements.workspaceNodesContainer && elements.workspaceEdgesSvg) {
+    requestAnimationFrame(function () {
+      renderSitemapVisual(
+        sitemapFlowData,
+        elements.workspaceNodesContainer,
+        elements.workspaceEdgesSvg,
+        preset
+      );
+    });
+  }
+}
+
 async function loadSitemapWorkspace() {
   if (!state.currentProject) return;
 
   if (elements.resetWorkspaceSitemapBtn)
     elements.resetWorkspaceSitemapBtn.style.display = "flex";
 
-  // Show loading state in keys containers if possible, or just wait.
-  // We shouldn't nuke the workspace structure.
-
   try {
     const { flow } = await api.getFlow(state.currentProject);
     sitemapFlowData = flow;
+
+    // Set default device view from captured profile
+    var capturedDevice = (flow && flow.deviceProfile) || 'desktop';
+    var preset = SITEMAP_DEVICE_PRESETS[capturedDevice] || SITEMAP_DEVICE_PRESETS.desktop;
+    currentSitemapDevice = capturedDevice;
+
+    // Update CSS vars + active button (without triggering re-render)
+    var workspace = elements.sitemapWorkspace;
+    if (workspace) {
+      workspace.style.setProperty('--sitemap-node-w', preset.nodeW + 'px');
+      workspace.style.setProperty('--sitemap-thumb-h', preset.thumbH + 'px');
+    }
+    var selector = document.getElementById('sitemapDeviceSelector');
+    if (selector) {
+      selector.querySelectorAll('.sitemap-device-btn').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.device === capturedDevice);
+      });
+    }
 
     renderSitemapVisual(
       flow,
       elements.workspaceNodesContainer,
       elements.workspaceEdgesSvg,
+      preset
     );
     setupSitemapPanning(
       elements.sitemapWorkspace,
@@ -2541,6 +2643,7 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
             <div class="node-preview-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px;background:#f1f5f9;">
               ⏳
             </div>
+            <div class="node-overlay" style="position:absolute;inset:0;z-index:5;cursor:pointer;"></div>
         </div>
         <div class="node-info">
             <div class="node-title">${cleanName}</div>
@@ -2691,7 +2794,7 @@ function createVisualNode(node, x, y, container, flow, startNodePath, svg) {
   return div;
 }
 
-function renderSitemapVisual(flow, container, svg) {
+function renderSitemapVisual(flow, container, svg, devicePreset) {
   if (!container || !svg) return;
 
   container.innerHTML = "";
@@ -2830,8 +2933,8 @@ function renderSitemapVisual(flow, container, svg) {
   // Large canvas origin
   const startX = 10000;
   const startY = 10000;
-  const spacingX = 420;
-  const spacingY = 300;
+  const spacingX = (devicePreset && devicePreset.spacingX) || 420;
+  const spacingY = (devicePreset && devicePreset.spacingY) || 300;
 
   // Helper to find a UI node in screenNodes array by path
   // We need this because state.mainTree has structure, screenNodes has flattened UI data.
@@ -3031,7 +3134,9 @@ function renderSitemapVisual(flow, container, svg) {
     rankYTracker.set(rank, colY + spacingY);
 
     // OVERRIDE: If user has moved this node, use saved position
-    if (flow && flow.positions && flow.positions[normItemPath]) {
+    // BUT skip if we are rendering for a non-desktop device (force fresh layout)
+    var useDesktopLayout = !devicePreset || devicePreset.nodeW === 280;
+    if (useDesktopLayout && flow && flow.positions && flow.positions[normItemPath]) {
       x = flow.positions[normItemPath].x;
       y = flow.positions[normItemPath].y;
     }
@@ -3057,7 +3162,8 @@ function renderSitemapVisual(flow, container, svg) {
 
   // 5. Draw Edges
   if (flow && flow.edges) {
-    renderEdges(flow.edges, nodePositions, container, svg);
+    var edgeNodeW = (devicePreset && devicePreset.nodeW) || 280;
+    renderEdges(flow.edges, nodePositions, container, svg, edgeNodeW);
   }
 
   // 6. Lazy load previews with IntersectionObserver
@@ -3076,8 +3182,13 @@ function renderSitemapVisual(flow, container, svg) {
           // Create lightweight iframe for this node
           const iframe = document.createElement("iframe");
           iframe.src = previewUrl;
+          // Render iframe at real device viewport, then scale to fit node
+          var iframeW = (devicePreset && devicePreset.iframeW) || 1400;
+          var iframeH = (devicePreset && devicePreset.iframeH) || 800;
+          var nodeW = (devicePreset && devicePreset.nodeW) || 280;
+          var scaleFactor = (nodeW / iframeW).toFixed(4);
           iframe.sandbox = "allow-same-origin allow-scripts";
-          iframe.style.cssText = "width:1400px;height:800px;transform:scale(0.2);transform-origin:0 0;border:none;pointer-events:none;position:absolute;top:0;left:0;opacity:0;transition:opacity 0.3s;";
+          iframe.style.cssText = `width:${iframeW}px;height:${iframeH}px;transform:scale(${scaleFactor});transform-origin:0 0;border:none;pointer-events:none;position:absolute;top:0;left:0;opacity:0;transition:opacity 0.3s;`;
 
           iframe.onload = () => {
             // Fade in
@@ -3139,12 +3250,14 @@ function redrawEdgesOnly() {
 
     // Redraw edges using current positions
     if (sitemapFlowData.edges) {
-      renderEdges(sitemapFlowData.edges, sitemapNodePositions, container, svg);
+      var edgeW = (SITEMAP_DEVICE_PRESETS[currentSitemapDevice] && SITEMAP_DEVICE_PRESETS[currentSitemapDevice].nodeW) || 280;
+      renderEdges(sitemapFlowData.edges, sitemapNodePositions, container, svg, edgeW);
     }
   });
 }
 
-function renderEdges(edges, nodePositions, container, svg) {
+function renderEdges(edges, nodePositions, container, svg, nodeW) {
+  nodeW = nodeW || 280;
   // Group edges by source -> target to avoid overlapping lines
   const uniqueEdges = new Map();
   const normalize = (p) =>
@@ -3186,7 +3299,7 @@ function renderEdges(edges, nodePositions, container, svg) {
     const targetPos = getPos(normalize(edge.to));
 
     if (sourcePos && targetPos) {
-      const x1 = sourcePos.x + 280; // Right side of 280px node
+      const x1 = sourcePos.x + nodeW; // Right side of node
       const y1 = sourcePos.y + 80; // ~Middle
       const x2 = targetPos.x;
       const y2 = targetPos.y + 80;

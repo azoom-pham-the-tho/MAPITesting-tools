@@ -1,6 +1,6 @@
-const CACHE_VERSION = 'v5';
-const STATIC_CACHE = 'static-v5';
-const DYNAMIC_CACHE = 'dynamic-v5';
+const CACHE_VERSION = 'v8';
+const STATIC_CACHE = 'static-v8';
+const DYNAMIC_CACHE = 'dynamic-v8';
 
 const STATIC_ASSETS = [
   '/',

@@ -32,10 +32,29 @@ class CompareService {
         const pages1 = await this.getAllPages(section1Path);
         const pages2 = await this.getAllPages(section2Path);
 
+        // Read device profiles from flow.json (if exists)
+        const readDeviceProfile = async (sPath) => {
+            const flowPath = path.join(sPath, 'flow.json');
+            if (await fs.pathExists(flowPath)) {
+                try {
+                    const flow = await fs.readJson(flowPath);
+                    return flow.deviceProfile || 'desktop';
+                } catch (e) { }
+            }
+            return 'desktop';
+        };
+        const [dp1, dp2] = await Promise.all([
+            readDeviceProfile(section1Path),
+            readDeviceProfile(section2Path)
+        ]);
+
         // Build comparison result
         const result = {
             section1: section1Timestamp,
             section2: section2Timestamp,
+            deviceWarning: dp1 !== dp2
+                ? `⚠️ So sánh giữa thiết bị khác nhau: ${dp1} ↔ ${dp2}. Kết quả có thể khác do viewport.`
+                : null,
             summary: {
                 total1: pages1.length,
                 total2: pages2.length,

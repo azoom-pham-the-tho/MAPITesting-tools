@@ -1213,8 +1213,7 @@ body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.75);
   z-index: 1000;
   align-items: center;
   justify-content: center;
@@ -1671,10 +1670,11 @@ body {
 }
 
 #preview-frame {
-  flex: 1;
+  flex: 1 1 auto;
   height: 100%;
   width: 100%;
   border: none;
+  min-width: 0;
 }
 
 /* Resizers */
@@ -1755,10 +1755,10 @@ body {
   background: white;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  width: 280px;
+  width: var(--sitemap-node-w, 280px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), width 0.25s ease, opacity 0.25s ease;
   z-index: 10;
   overflow: hidden;
 }
@@ -1771,12 +1771,13 @@ body {
 
 .node-thumbnail {
   width: 100%;
-  height: 180px;
+  height: var(--sitemap-thumb-h, 180px);
   background: #f1f5f9;
   background-size: cover;
   background-position: top center;
   border-bottom: 1px solid var(--border-color);
   position: relative;
+  transition: height 0.25s ease;
 }
 
 .node-thumbnail::after {
@@ -3455,7 +3456,7 @@ body {
 }
 
 .modal-content {
-  animation: modalSpringIn 0.35s var(--spring-smooth) !important;
+  animation: modalIn 0.2s ease-out;
 }
 
 /* Tree node expand animation */

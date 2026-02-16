@@ -38,6 +38,8 @@
     document.addEventListener('click', function (e) {
       const btn = e.target.closest('.btn');
       if (!btn || btn.disabled) return;
+      // Skip ripple for small/toggle buttons — avoids forced reflow
+      if (btn.classList.contains('btn-xs') || btn.classList.contains('device-profile-btn')) return;
 
       const rect = btn.getBoundingClientRect();
       const x = e.clientX - rect.left;

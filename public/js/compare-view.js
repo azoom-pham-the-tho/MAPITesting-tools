@@ -55,10 +55,16 @@ const CompareView = {
     populateSections(sections) {
         if (!sections) return;
 
+        const DEVICE_ICONS = { desktop: '🖥', tablet: '⬛', mobile: '📱', custom: '⚙' };
         const mainOption = '<option value="main">Main (Gốc)</option>';
-        const options = sections.map(s =>
-            `<option value="${s.timestamp}">${this.formatTimestamp(s.timestamp)}</option>`
-        ).join('');
+        const options = sections.map(function (s) {
+            var tag = '';
+            if (s.deviceProfile && s.deviceProfile !== 'desktop') {
+                var icon = DEVICE_ICONS[s.deviceProfile] || '';
+                tag = ' ' + icon + ' ' + (s.deviceProfile.charAt(0).toUpperCase() + s.deviceProfile.slice(1));
+            }
+            return '<option value="' + s.timestamp + '">' + CompareView.formatTimestamp(s.timestamp) + tag + '</option>';
+        }).join('');
 
         // UI Selectors
         const uiSelect1 = document.getElementById('compareSection1');
@@ -234,7 +240,13 @@ const CompareView = {
         const enhancedStats = this.calculateEnhancedStats(filteredItems);
 
         // Render summary header immediately
+        var deviceWarningHtml = '';
+        if (result.deviceWarning) {
+            deviceWarningHtml = '<div class="device-warning" style="background: var(--warning-bg, #fff3cd); color: var(--warning-text, #856404); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid var(--warning-border, #ffc107);">' + result.deviceWarning + '</div>';
+        }
+
         container.innerHTML = `
+        ${deviceWarningHtml}
         <div class="compare-summary">
             <div class="summary-header">
                 <h3>📊 Kết quả so sánh ${type.toUpperCase()}</h3>

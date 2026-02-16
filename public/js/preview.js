@@ -20,15 +20,27 @@ const Preview = {
     container.innerHTML = `
       <div class="workspace-preview">
         <div class="preview-header">
-          ${options.transitions && options.transitions.length > 0 ? `<span class="preview-hint" style="font-size: 10px; color: var(--accent-primary);">⚡ Có ${options.transitions.length} tương tác chuyển màn</span>` : '<span></span>'}
+          <div class="device-toolbar">
+            <button class="device-btn active" data-device="desktop" title="Xem ở chế độ Desktop (toàn màn hình)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></button>
+            <button class="device-btn" data-device="tablet" title="Xem ở chế độ Tablet (768×1024)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg></button>
+            <button class="device-btn" data-device="mobile" title="Xem ở chế độ Mobile (375×812)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg></button>
+            <span class="device-sep">|</span>
+            <input type="number" class="device-input" id="device-w" placeholder="W" min="280" max="3840" title="Chiều rộng tuỳ chỉnh (px)">
+            <span class="device-x">×</span>
+            <input type="number" class="device-input" id="device-h" placeholder="H" min="400" max="2560" title="Chiều cao tuỳ chỉnh (px)">
+            <button class="device-btn device-apply" id="device-apply-btn" title="Áp dụng kích thước tuỳ chỉnh">✓</button>
+            <button class="device-btn device-rotate" id="device-rotate-btn" title="Xoay ngang/dọc (Portrait ↔ Landscape)">↻</button>
+            <span class="device-label" id="device-label">Desktop</span>
+          </div>
           <div class="preview-actions">
-            <button class="btn btn-xs btn-secondary" id="preview-fullscreen">
+            ${options.transitions && options.transitions.length > 0 ? `<span class="preview-hint" style="font-size: 10px; color: var(--accent-primary);">⚡ Có ${options.transitions.length} tương tác chuyển màn</span>` : ''}
+            <button class="btn btn-xs btn-secondary" id="preview-fullscreen" title="Xem toàn màn hình">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
               </svg>
               Fullscreen
             </button>
-            <button class="btn btn-xs btn-secondary" id="preview-new-tab">
+            <button class="btn btn-xs btn-secondary" id="preview-new-tab" title="Mở preview trong tab mới">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
@@ -52,7 +64,9 @@ const Preview = {
             </button>
           </div>
         </div>
-        <iframe id="preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
+        <div class="preview-viewport-wrapper" id="preview-viewport-wrapper">
+          <iframe id="preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
       </div>
 
       <style>
@@ -68,24 +82,116 @@ const Preview = {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 8px 12px;
+          padding: 6px 12px;
           background: var(--bg-tertiary);
           border-bottom: 1px solid var(--border-color);
-        }
-        .preview-title {
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--text-secondary);
+          gap: 8px;
+          flex-wrap: wrap;
         }
         .preview-actions {
           display: flex;
           gap: 6px;
+          align-items: center;
+        }
+        /* Device Toolbar */
+        .device-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .device-btn {
+          width: 28px; height: 28px;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: transparent;
+          cursor: pointer;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.15s, border-color 0.15s;
+          color: var(--text-secondary);
+        }
+        .device-btn:hover {
+          background: var(--bg-secondary);
+          border-color: var(--accent-primary);
+        }
+        .device-btn.active {
+          background: var(--accent-primary);
+          border-color: var(--accent-primary);
+          color: #fff;
+          box-shadow: 0 1px 4px rgba(37,99,235,0.3);
+        }
+        .device-sep {
+          color: var(--text-muted);
+          font-size: 12px;
+          margin: 0 2px;
+          user-select: none;
+        }
+        .device-x {
+          color: var(--text-muted);
+          font-size: 11px;
+          user-select: none;
+        }
+        .device-input {
+          width: 48px;
+          padding: 3px 4px;
+          font-size: 11px;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          text-align: center;
+          outline: none;
+        }
+        .device-input:focus {
+          border-color: var(--accent-primary);
+        }
+        .device-input::-webkit-inner-spin-button,
+        .device-input::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .device-apply {
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--text-secondary);
+        }
+        .device-rotate {
+          font-size: 15px;
+        }
+        .device-label {
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-left: 4px;
+          white-space: nowrap;
+        }
+        /* Viewport Wrapper */
+        .preview-viewport-wrapper {
+          flex: 1;
+          overflow: auto;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          contain: layout style;
+        }
+        .preview-viewport-wrapper.device-active {
+          background: var(--bg-tertiary);
+          padding: 24px;
         }
         #preview-frame {
-          flex: 1;
           width: 100%;
+          height: 100%;
           border: none;
           background: #fff;
+          transform: translateZ(0);
+        }
+        .preview-viewport-wrapper.device-active #preview-frame {
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          flex-shrink: 0;
+          will-change: transform;
+          overflow: hidden;
         }
       </style>
     `;
@@ -224,8 +330,109 @@ const Preview = {
       }
     };
 
+    // ===== DEVICE VIEWPORT LOGIC =====
+    var DEVICE_PRESETS = {
+      desktop: { w: '100%', h: '100%', label: 'Desktop' },
+      tablet: { w: 768, h: 1024, label: 'Tablet 768×1024' },
+      mobile: { w: 375, h: 812, label: 'Mobile 375×812' }
+    };
+
+    var vpWrapper = container.querySelector('#preview-viewport-wrapper');
+    var deviceWInput = container.querySelector('#device-w');
+    var deviceHInput = container.querySelector('#device-h');
+    var deviceLabel = container.querySelector('#device-label');
+    var currentDeviceW = '100%';
+    var currentDeviceH = '100%';
+
+    function applyViewport(w, h, label) {
+      if (!vpWrapper || !iframe) return;
+
+      currentDeviceW = w;
+      currentDeviceH = h;
+
+      if (w === '100%') {
+        // Desktop — iframe phủ toàn container
+        vpWrapper.classList.remove('device-active');
+        iframe.style.flex = '1 1 auto';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.maxWidth = '';
+        deviceWInput.value = '';
+        deviceHInput.value = '';
+      } else {
+        // Device mode — kích thước cố định, căn giữa
+        vpWrapper.classList.add('device-active');
+        iframe.style.flex = 'none';
+        iframe.style.width = w + 'px';
+        iframe.style.height = h + 'px';
+        iframe.style.maxWidth = w + 'px';
+        deviceWInput.value = w;
+        deviceHInput.value = h;
+      }
+
+      if (deviceLabel) deviceLabel.textContent = label || '';
+    }
+
+    // Preset buttons — event delegation on toolbar
+    var deviceToolbar = container.querySelector('.device-toolbar');
+    if (deviceToolbar) {
+      deviceToolbar.addEventListener('click', function (e) {
+        var btn = e.target.closest('.device-btn[data-device]');
+        if (!btn) return;
+
+        var device = btn.dataset.device;
+        var preset = DEVICE_PRESETS[device];
+        if (!preset) return;
+
+        applyViewport(preset.w, preset.h, preset.label);
+
+        // Cập nhật trạng thái active
+        deviceToolbar.querySelectorAll('.device-btn[data-device]').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+      });
+    }
+
+    // Apply button — áp dụng kích thước tuỳ chỉnh
+    var applyBtn = container.querySelector('#device-apply-btn');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function () {
+        var w = parseInt(deviceWInput.value) || 1440;
+        var h = parseInt(deviceHInput.value) || 900;
+        // Clamp values
+        w = Math.max(280, Math.min(3840, w));
+        h = Math.max(400, Math.min(2560, h));
+        applyViewport(w, h, 'Tuỳ chỉnh ' + w + '×' + h);
+        // Bỏ active ở preset buttons
+        if (deviceToolbar) {
+          deviceToolbar.querySelectorAll('.device-btn[data-device]').forEach(function (b) {
+            b.classList.remove('active');
+          });
+        }
+      });
+    }
+
+    // Rotate button — swap W ↔ H
+    var rotateBtn = container.querySelector('#device-rotate-btn');
+    if (rotateBtn) {
+      rotateBtn.addEventListener('click', function () {
+        var w = parseInt(iframe.style.width);
+        var h = parseInt(iframe.style.height);
+        if (!w || !h) return; // Desktop mode — không xoay
+        applyViewport(h, w, 'Xoay ' + h + '×' + w);
+        // Bỏ active ở preset buttons
+        if (deviceToolbar) {
+          deviceToolbar.querySelectorAll('.device-btn[data-device]').forEach(function (b) {
+            b.classList.remove('active');
+          });
+        }
+      });
+    }
+
+    // ===== EXISTING ACTION HANDLERS =====
+
     // Fullscreen handler
-    container.querySelector('#preview-fullscreen').addEventListener('click', () => {
+    container.querySelector('#preview-fullscreen').addEventListener('click', function () {
       if (iframe.requestFullscreen) {
         iframe.requestFullscreen();
       } else if (iframe.webkitRequestFullscreen) {
@@ -234,16 +441,16 @@ const Preview = {
     });
 
     // New tab handler
-    container.querySelector('#preview-new-tab').addEventListener('click', () => {
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+    container.querySelector('#preview-new-tab').addEventListener('click', function () {
+      var blob = new Blob([htmlContent], { type: 'text/html' });
+      var url = URL.createObjectURL(blob);
       window.open(url, '_blank');
     });
 
     // Add Comment handler - activates pin placement mode
-    const addCommentBtn = container.querySelector('#preview-add-comment');
+    var addCommentBtn = container.querySelector('#preview-add-comment');
     if (addCommentBtn) {
-      addCommentBtn.addEventListener('click', () => {
+      addCommentBtn.addEventListener('click', function () {
         if (window.CommentUI && typeof window.CommentUI.activatePinMode === 'function') {
           window.CommentUI.activatePinMode();
         }
@@ -251,9 +458,9 @@ const Preview = {
     }
 
     // Show Comments handler - toggles all comment pins visibility
-    const showCommentsBtn = container.querySelector('#preview-show-comments');
+    var showCommentsBtn = container.querySelector('#preview-show-comments');
     if (showCommentsBtn) {
-      showCommentsBtn.addEventListener('click', () => {
+      showCommentsBtn.addEventListener('click', function () {
         if (window.CommentUI && typeof window.CommentUI.togglePins === 'function') {
           window.CommentUI.togglePins();
         }

@@ -358,12 +358,14 @@ class StorageService {
                 let screenTree = [];
                 let screenCount = 0;
                 let apiCount = 0;
+                let sectionDeviceProfile = null;
 
                 if (await fs.pathExists(flowPath)) {
                     try {
                         const flowData = await fs.readJson(flowPath);
                         if (flowData.nodes) {
                             screenCount = flowData.nodes.filter(n => n.type !== 'start').length;
+                            sectionDeviceProfile = flowData.deviceProfile || null;
 
                             // Build node map and count APIs
                             const nodeMap = new Map();
@@ -464,6 +466,7 @@ class StorageService {
                     screenTree: screenTree,
                     screenCount: screenCount,
                     apiCount: apiCount,
+                    deviceProfile: sectionDeviceProfile,
                     history: []
                 };
 
