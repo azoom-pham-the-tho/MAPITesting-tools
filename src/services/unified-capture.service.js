@@ -163,6 +163,26 @@ class UnifiedCaptureService {
         const section = await storageService.createSection(projectName);
 
         try {
+            // Resolve device profile for viewport/userAgent BEFORE launching browser
+            const DEVICE_PRESETS = {
+                desktop: { viewport: null, userAgent: null },
+                tablet: { viewport: { width: 768, height: 1024 }, userAgent: 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15' },
+                mobile: { viewport: { width: 375, height: 812 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1' }
+            };
+
+            const profileName = (deviceProfile && deviceProfile.name) || 'desktop';
+            let resolved = DEVICE_PRESETS[profileName] || DEVICE_PRESETS.desktop;
+
+            // Custom profile with user-provided dimensions
+            if (profileName === 'custom' && deviceProfile) {
+                const w = Math.max(280, Math.min(3840, parseInt(deviceProfile.width) || 1440));
+                const h = Math.max(400, Math.min(2560, parseInt(deviceProfile.height) || 900));
+                resolved = { viewport: { width: w, height: h }, userAgent: null };
+            }
+
+            // Desktop: maximized. Mobile/tablet: sized to device
+            const isDeviceProfile = !!resolved.viewport;
+
             // Launch browser
             const chromePath = this.getChromePath();
             this.browser = await chromium.launch({
@@ -172,8 +192,11 @@ class UnifiedCaptureService {
                     '--no-sandbox',
                     '--disable-infobars',
                     '--disable-features=TranslateUI',
+                    '--disable-translate',
                     `--remote-debugging-port=${CHROME_DEBUG_PORT}`,
-                    '--start-maximized',
+                    isDeviceProfile
+                        ? `--window-size=${resolved.viewport.width},${resolved.viewport.height + 80}`
+                        : '--start-maximized',
                     // Performance optimizations
                     '--disable-extensions',
                     '--disable-background-networking',
@@ -195,23 +218,6 @@ class UnifiedCaptureService {
                     '--use-mock-keychain'
                 ]
             });
-
-            // Resolve device profile for viewport/userAgent
-            const DEVICE_PRESETS = {
-                desktop: { viewport: null, userAgent: null },
-                tablet: { viewport: { width: 768, height: 1024 }, userAgent: 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15' },
-                mobile: { viewport: { width: 375, height: 812 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1' }
-            };
-
-            const profileName = (deviceProfile && deviceProfile.name) || 'desktop';
-            let resolved = DEVICE_PRESETS[profileName] || DEVICE_PRESETS.desktop;
-
-            // Custom profile with user-provided dimensions
-            if (profileName === 'custom' && deviceProfile) {
-                const w = Math.max(280, Math.min(3840, parseInt(deviceProfile.width) || 1440));
-                const h = Math.max(400, Math.min(2560, parseInt(deviceProfile.height) || 900));
-                resolved = { viewport: { width: w, height: h }, userAgent: null };
-            }
 
             const contextOptions = {
                 viewport: resolved.viewport,
@@ -1395,7 +1401,7 @@ class UnifiedCaptureService {
             // Capture BOTH HTML and DOM tree (after user confirmed, not during freeze)
             // HTML = exact reproduction for preview/replay
             // DOM = structured tree for element-level comparison (with computed styles)
-            const { html, dom } = await this.page.evaluate(async () => {
+            const { html, dom } = await this.page.evaluate(() => {
                 // CSS properties critical for visual comparison
                 const STYLE_PROPS = [
                     'color', 'backgroundColor', 'fontSize', 'fontWeight', 'fontFamily',
@@ -1531,52 +1537,6 @@ class UnifiedCaptureService {
                 const captureOverlay = document.getElementById('capture-overlay');
                 if (captureModal) captureModal.remove();
                 if (captureOverlay) captureOverlay.remove();
-
-                // Inline all @font-face fonts as base64 so preview works without original server
-                try {
-                    const fontPromises = [];
-                    for (const sheet of document.styleSheets) {
-                        try {
-                            for (const rule of sheet.cssRules) {
-                                if (rule instanceof CSSFontFaceRule) {
-                                    const family = rule.style.getPropertyValue('font-family');
-                                    const weight = rule.style.getPropertyValue('font-weight') || 'normal';
-                                    const style = rule.style.getPropertyValue('font-style') || 'normal';
-                                    const src = rule.style.getPropertyValue('src');
-                                    // Extract woff2 URL first, fallback to woff
-                                    const woff2 = src.match(/url\(["']?([^"')]+\.woff2)["']?\)/);
-                                    const woff = src.match(/url\(["']?([^"')]+\.woff)["']?\)/);
-                                    const fontUrl = (woff2 && woff2[1]) || (woff && woff[1]);
-                                    if (fontUrl && family) {
-                                        fontPromises.push({ family, weight, style, url: fontUrl, format: woff2 ? 'woff2' : 'woff' });
-                                    }
-                                }
-                            }
-                        } catch (e) { /* cross-origin stylesheet — skip */ }
-                    }
-
-                    // Fetch and inline each font (limit to 5 to avoid slowness)
-                    const toInline = fontPromises.slice(0, 5);
-                    for (const ff of toInline) {
-                        try {
-                            const resp = await fetch(ff.url);
-                            if (!resp.ok) continue;
-                            const blob = await resp.blob();
-                            // Skip if too large (> 2MB)
-                            if (blob.size > 2 * 1024 * 1024) continue;
-                            const base64 = await new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = () => resolve(reader.result);
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-                            const inlineStyle = document.createElement('style');
-                            inlineStyle.setAttribute('data-inlined-font', 'true');
-                            inlineStyle.textContent = `@font-face{font-family:${ff.family};font-style:${ff.style};font-weight:${ff.weight};src:url(${base64}) format("${ff.format}")}`;
-                            document.head.appendChild(inlineStyle);
-                        } catch (e) { /* font fetch failed — skip */ }
-                    }
-                } catch (e) { /* font inlining failed — continue without */ }
 
                 // Capture HTML and DOM while UI elements are removed
                 const html = document.documentElement.outerHTML;
@@ -1849,33 +1809,46 @@ class UnifiedCaptureService {
     async stopSession() {
         this.isClosing = true;  // Signal 'closing' status to frontend
 
+        const captureCount = this.currentSession?.captures?.length || 0;
         const result = {
             success: true,
             projectName: this.currentSession?.projectName,
             sectionTimestamp: this.currentSession?.sectionTimestamp,
-            captures: this.currentSession?.captures?.length || 0,
+            captures: captureCount,
             actions: this.sessionActionCount,
             apis: this.sessionAPICount
         };
 
         if (this.currentSession) {
-            try {
-                await fs.writeJson(
-                    path.join(this.currentSession.sectionPath, 'session.json'),
-                    {
-                        project: this.currentSession.projectName,
-                        section: this.currentSession.sectionTimestamp,
-                        domain: this.currentSession.domain,
-                        startPath: this.extractPath(this.currentSession.startUrl),
-                        startTime: this.currentSession.startTime,
-                        endTime: new Date().toISOString(),
-                        captures: this.currentSession.captures,
-                        stats: { actions: this.sessionActionCount, apis: this.sessionAPICount }
-                    },
-                    { spaces: 2 }
-                );
-            } catch (e) {
-                console.log('[UnifiedCapture] Session save failed:', e.message);
+            if (captureCount === 0) {
+                // No captures — remove empty section folder
+                try {
+                    await fs.remove(this.currentSession.sectionPath);
+                    console.log('[UnifiedCapture] 🗑️ Empty section removed (0 captures)');
+                    result.removed = true;
+                } catch (e) {
+                    console.log('[UnifiedCapture] Could not remove empty section:', e.message);
+                }
+            } else {
+                // Has captures — save session data
+                try {
+                    await fs.writeJson(
+                        path.join(this.currentSession.sectionPath, 'session.json'),
+                        {
+                            project: this.currentSession.projectName,
+                            section: this.currentSession.sectionTimestamp,
+                            domain: this.currentSession.domain,
+                            startPath: this.extractPath(this.currentSession.startUrl),
+                            startTime: this.currentSession.startTime,
+                            endTime: new Date().toISOString(),
+                            captures: this.currentSession.captures,
+                            stats: { actions: this.sessionActionCount, apis: this.sessionAPICount }
+                        },
+                        { spaces: 2 }
+                    );
+                } catch (e) {
+                    console.log('[UnifiedCapture] Session save failed:', e.message);
+                }
             }
         }
 
